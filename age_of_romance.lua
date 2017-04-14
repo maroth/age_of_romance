@@ -8,6 +8,7 @@ require 'neural_network'
 
 local tds = require 'tds'
 local threads = require 'threads'
+threads.Threads.serialization('threads.sharedserialize')
 
 train_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
 test_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
@@ -21,13 +22,12 @@ if arg[2] ~= nil then
 end
 
 local learning_rate = 0.001
-local minibatch_size = 100
+local minibatch_size = 10
 local epochs = 5
 
 local cross_thread_minibatch_frames = tds.Hash()
 local cross_thread_minibatch_dates = tds.Hash()
 
-threads.Threads.serialization('threads.sharedserialize')
 
 function load_images_async(frame_files, frame_films, minibatch_size, load_data_mutex_id, train_data_mutex_id, thread_pool) 
     local local_load_mutex_id = load_data_mutex_id
