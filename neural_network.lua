@@ -36,7 +36,7 @@ function alexNet()
     classifier:add(nn.Linear(4096, 1000))
     classifier:add(nn.Linear(1000, 100))
     classifier:add(nn.Linear(100, 1))
-    classifier:add(nn.Sigmoid())
+    --classifier:add(nn.Sigmoid())
 
     local model = nn.Sequential()
     model:add(features):add(classifier)
@@ -93,5 +93,9 @@ function vgg16()
     vgg16:add(nn.ReLU(true))
     vgg16:add(nn.Linear(1000, 1))
     vgg16:add(nn.Sigmoid())
-    return vgg16
+
+    local criterion = nn.AbsCriterion()
+
+    return vgg16, criterion
+
 end

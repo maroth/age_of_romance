@@ -28,8 +28,7 @@ local epochs = 5
 local cross_thread_minibatch_frames = tds.Hash()
 local cross_thread_minibatch_dates = tds.Hash()
 
-local neural_network = build_neural_network()
-local criterion = nn.MSECriterion()
+local neural_network, criterion = build_neural_network()
 
 
 local starting_time = os.time()
@@ -103,7 +102,9 @@ function train_epoch(learning_rate, load_data_mutex, train_data_mutex, epoch_ind
 
         neural_network:zeroGradParameters()
         local err = criterion:forward(prediction, date)
-        print("pred: ", string.format("%.3f", prediction[1][1]), "date: ", string.format("%.3f", date[1]), "err: ", string.format("%.3f", err))
+        for i = 1, minibatch_size do
+            print("prediction: ", string.format("%.3f", prediction[i][1]), "truth: ", string.format("%.3f", date[i]), "error: ", string.format("%.3f", err))
+        end
         err_sum = err_sum + err
 
         local grad_criterion = criterion:backward(prediction, date)
