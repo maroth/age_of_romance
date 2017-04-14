@@ -2,16 +2,28 @@ require 'image'
 require 'nn'
 require 'lfs'
 
+local tds = require 'tds'
+local threads = require 'threads'
 local json = require 'cjson'
+local date_logic = require 'date_logic'
 
-train_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
+train_frame_dir = "/mnt/e/age_of_romance/micro_frames/"
 test_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
 
-zero_date = os.time({year = 1960, month = 1, day = 1})
-one_date = os.time({year = 2010, month = 1, day = 1})
+local learning_rate = 0.001
+local minibatch_size = 2
+local epochs = 5
+local frame_size = torch.LongStorage(3)
+frame_size[1] = 3
+frame_size[2] = 189
+frame_size[3] = 320
+local input_size = frame_size[1] * frame_size[2] * frame_size[3]
 
-learning_rate = 0.001
-epochs = 5
+threads.Threads.serialization('threads.sharedserialize')
+
+local current_minibatch_frames = tds.Hash()
+local current_minibatch_dates = tds.Hash()
+
 
 function string.ends(String,End)
    return End=='' or string.sub(String,-string.len(End))==End
@@ -30,84 +42,18 @@ function parse_info_file(info_file_path)
     return film_info
 end
 
-function parse_date(date_to_convert)
-    local pattern = "(%d+)-(%d+)-(%d+)"
-    local runyear, runmonth, runday = date_to_convert:match(pattern)
-    local time_stamp = os.time({year = runyear, month = runmonth, day = runday})
-    return time_stamp
-end
-
-function normalize_date(date_to_normalize)
-    if date_to_normalize > one_date then
-        print("ERROR: movie too new")
-    end 
-    if date_to_normalize < zero_date then
-        print("ERROR: movie too old")
-    end 
-    local normalized_date = (date_to_normalize - zero_date) / (one_date - zero_date)
-    local normalized_date_tensor = torch.DoubleTensor(1)
-    normalized_date_tensor[1] = normalized_date
-    return normalized_date_tensor
-end
-
-function denormalize_date(date_to_denormalize)
-    denormalized_date = date_to_denormalize[1] * (one_date - zero_date) + zero_date
-    date_table = os.date("*t", denormalized_date)
-    date_string = date_table.year .. "-" .. date_table.month .. "-" .. date_table.day
-    return date_string
-end
 
 function get_frame_size(films)
     return films[1].frames[1]:size()
 end
 
-function load_films(frame_dir)
-    films = {}
-    for film_dir in lfs.dir(frame_dir) do    
-        local info_file_path = frame_dir .. "/" .. film_dir .. "/info.json"
-        if file_exists(info_file_path) then
-            local film  = parse_info_file(info_file_path)
-            film.normalized_date = normalize_date(parse_date(film.date))
-            film.frames = {}
-            for frame_file in lfs.dir(frame_dir .. "/" .. film_dir) do
-                if (string.ends(frame_file, ".png")) then
-                    local frame_file_dir = frame_dir .. "/" .. film_dir .. "/" .. frame_file
-                    local frame_id = string.gsub(frame_file, "frame", "")
-                    frame_id = string.gsub(frame_id, ".png", "")
-                    film.frames[tonumber(frame_id)] = image.load(frame_file_dir, 3, 'double')
-                end
-            end
-            table.insert(films, film)
-        end
-    end
-    print ("films loaded from " .. frame_dir)
-    return films
-end
-
-function build_shuffled_frame_set(films)
-    local number_of_frames = 0
-    for film_index, film in ipairs(films) do
-        for frame_index, frame in ipairs(film.frames) do
-            number_of_frames = number_of_frames + 1
-        end
-    end
-
-    local frame_size = get_frame_size(films)
-    frames = torch.DoubleTensor(number_of_frames, frame_size[1], frame_size[2], frame_size[3])
-    dates = torch.DoubleTensor(number_of_frames)
-    index = 0
-    for film_index, film in ipairs(films) do
-        for frame_index, frame in ipairs(film.frames) do
-            index = index + 1
-            frames[index] = frame
-            dates[index] = film.normalized_date
-        end
-    end
-
-    randomized_indexes = torch.randperm(number_of_frames):long()
-    shuffled_frames = frames:index(1, randomized_indexes)
-    shuffled_dates = dates:index(1, randomized_indexes)
-    return shuffled_frames, shuffled_dates
+-- updates current output line
+local last_str = ""
+function update_output(str)
+    io.write(('\b \b'):rep(#last_str))
+    io.write(str)                     
+    io.flush()
+    last_str = str
 end
 
 function train(films, learning_rate, epochs)
@@ -159,8 +105,151 @@ function test(neural_network, films)
     end
 end
 
-train_films = load_films(train_frame_dir)
-neural_network = train(films, learning_rate, epochs)
+function build_frame_set(frame_dir)
+    local index = 0
+    frame_files = {}
+    frame_films = {}
+    for film_dir in lfs.dir(frame_dir) do    
+        local info_file_path = frame_dir .. "/" .. film_dir .. "/info.json"
+        if file_exists(info_file_path) then
+            local film  = parse_info_file(info_file_path)
+            film.normalized_date = normalize_date(parse_date(film.date))
+            for frame_file in lfs.dir(frame_dir .. "/" .. film_dir) do
+                if (string.ends(frame_file, ".png")) then
+                    index = index + 1
+                    update_output("loading frame : " .. index)
+                    frame_files[index] = frame_dir .. film_dir .. "/" .. frame_file
+                    frame_films[index] = film
+                end
+            end
+        end
+    end
+    print("")
+    return frame_files, frame_films
+end
 
-test_films = load_films(test_frame_dir)
-test(neural_network, films)
+function build_shuffled_frame_set(films)
+    local number_of_frames = get_films_frame_count(films)
+    local randomized_indexes = torch.randperm(number_of_frames):long()
+
+    local frame_size = get_frame_size(films)
+    frames = torch.DoubleTensor(number_of_frames, frame_size[1], frame_size[2], frame_size[3])
+    dates = torch.DoubleTensor(number_of_frames)
+    index = 0
+    for film_index, film in ipairs(films) do
+        for frame_index, frame in ipairs(film.frames) do
+            index = index + 1
+            frames[index] = frame
+            dates[index] = film.normalized_date
+        end
+    end
+
+    shuffled_frames = frames:index(1, randomized_indexes)
+    shuffled_dates = dates:index(1, randomized_indexes)
+    return shuffled_frames, shuffled_dates
+end
+
+
+function start_asynch_loading_thread(frame_files, frame_films, minibatch_size, load_data_mutex_id, train_data_mutex_id, thread_pool) 
+    local load_mutex_id = load_data_mutex_id
+    local train_mutex_id = train_data_mutex_id
+    thread_pool:addjob(
+        function()
+            local threads = require 'threads'
+            local torch = require 'torch'
+            local image = require 'image'
+
+            local load_data_mutex = threads.Mutex(load_mutex_id)
+            local train_data_mutex = threads.Mutex(train_mutex_id)
+
+            local number_of_frames = 0
+            for _, frame in ipairs(frame_files) do
+                number_of_frames = number_of_frames + 1
+            end
+
+            local number_of_minibatches = math.floor(number_of_frames / minibatch_size)
+
+            local randomized_indexes = torch.randperm(number_of_frames):long()
+
+            local shuffled_frame_files = {}
+            local shuffled_frame_films = {}
+            for index = 1, number_of_frames do
+                shuffled_frame_files[index] = frame_files[randomized_indexes[index]]
+                shuffled_frame_films[index] = frame_films[randomized_indexes[index]]
+            end
+
+            for minibatch_index = 1, number_of_minibatches do
+                train_data_mutex:lock()
+                for frame_index = 1, minibatch_size do
+                    local frame = image.load(shuffled_frame_files[minibatch_index + frame_index], 3, 'double')
+                    current_minibatch_frames[frame_index] = frame
+
+                    local film = shuffled_frame_films[minibatch_index + frame_index]
+                    current_minibatch_dates[frame_index] = film.normalized_date
+                end
+                load_data_mutex:unlock()
+                collectgarbage()
+                collectgarbage()
+            end
+
+        end
+    )
+end
+
+function train_minibatch(neural_network, criterion, load_data_mutex, train_data_mutex) 
+    local number_of_frames = 0
+    for _, frame in ipairs(frame_files) do
+        number_of_frames = number_of_frames + 1
+    end
+
+    local number_of_minibatches = math.floor(number_of_frames / minibatch_size)
+
+    for minibatch_index = 1, number_of_minibatches do
+        update_output("minibatch: " .. minibatch_index)
+        load_data_mutex:lock()
+
+        local frame_size = current_minibatch_frames[1]:size()
+        local input_size = frame_size[1] * frame_size[2] * frame_size[3]
+
+        for frame_index = 1, minibatch_size do
+            local frame = current_minibatch_frames[frame_index]
+            local date = current_minibatch_dates[frame_index]
+            local reshaped_frame = torch.reshape(frame, input_size)
+            local prediction = neural_network:forward(reshaped_frame)
+            neural_network:zeroGradParameters()
+            local err = criterion:forward(prediction, date)
+            local grad_criterion = criterion:backward(prediction, date)
+            neural_network:backward(reshaped_frame, grad_criterion)
+            neural_network:updateParameters(learning_rate)
+        end
+        train_data_mutex:unlock()
+    end
+    print("")
+end
+
+
+local neural_network = nn.Sequential()
+neural_network:add(nn.Linear(input_size, 1))
+neural_network:add(nn.Sigmoid())
+local criterion = nn.MSECriterion()
+frame_files, frame_films = build_frame_set(train_frame_dir)
+
+local load_data_thread_pool = threads.Threads(1, function(thread_id) end)
+
+for epoch_index = 1, epochs do
+    local load_data_mutex = threads.Mutex()
+    local train_data_mutex = threads.Mutex()
+    local load_data_mutex_id = load_data_mutex:id()
+    local train_data_mutex_id = train_data_mutex:id()
+    load_data_mutex:lock()
+
+    print("epoch " .. epoch_index)
+    start_asynch_loading_thread(frame_files, frame_films, minibatch_size, load_data_mutex_id, train_data_mutex_id, load_data_thread_pool)
+    train_minibatch(neural_network, criterion, load_data_mutex, train_data_mutex, load_data_mutex, train_data_mutex)
+
+    load_data_mutex:free()
+    train_data_mutex:free()
+    load_data_thread_pool:synchronize()
+end
+
+load_data_thread_pool:terminate()
