@@ -10,8 +10,8 @@ local tds = require 'tds'
 local threads = require 'threads'
 threads.Threads.serialization('threads.sharedserialize')
 
-train_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
-test_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
+train_frame_dir = "/mnt/e/age_of_romance/sanity_check/"
+test_frame_dir = "/mnt/e/age_of_romance/sanity_check/"
 
 if arg[1] ~= nil then
     train_frame_dir = arg[1]
@@ -21,17 +21,21 @@ if arg[2] ~= nil then
     test_frame_dir = arg[2]
 end
 
-local learning_rate = 0.001
-local minibatch_size = 10
+local learning_rate = 0.01
+local minibatch_size = 2
 local epochs = 5
 
 local cross_thread_minibatch_frames = tds.Hash()
 local cross_thread_minibatch_dates = tds.Hash()
 
+local neural_network = build_neural_network()
+local criterion = nn.MSECriterion()
 
-function load_images_async(frame_files, frame_films, minibatch_size, load_data_mutex_id, train_data_mutex_id, thread_pool) 
-    local local_load_mutex_id = load_data_mutex_id
-    local local_train_mutex_id = train_data_mutex_id
+
+local starting_time = os.time()
+
+-- start a second thread each epoch that loads the image data for the current minibatch while it is being trained on
+function load_images_async(frame_files, frame_films, load_data_mutex_id, train_data_mutex_id, thread_pool) 
     local example_frame = image.load(frame_files[1], 3, 'double')
 
     thread_pool:addjob(
@@ -41,8 +45,8 @@ function load_images_async(frame_files, frame_films, minibatch_size, load_data_m
             local image = require 'image'
             require 'helpers'
 
-            local load_data_mutex = threads.Mutex(local_load_mutex_id)
-            local train_data_mutex = threads.Mutex(local_train_mutex_id)
+            local load_data_mutex = threads.Mutex(load_data_mutex_id)
+            local train_data_mutex = threads.Mutex(train_data_mutex_id)
 
             local number_of_frames = count_frames(frame_files)
             local number_of_minibatches = math.floor(number_of_frames / minibatch_size)
@@ -60,13 +64,15 @@ function load_images_async(frame_files, frame_films, minibatch_size, load_data_m
             local minibatch_dates = torch.DoubleTensor(minibatch_size)
 
             for minibatch_index = 1, number_of_minibatches do
-                train_data_mutex:lock()
+
                 for frame_index = 1, minibatch_size do
                     local frame = image.load(shuffled_frame_files[minibatch_index + frame_index], 3, 'double')
                     local film = shuffled_frame_films[minibatch_index + frame_index]
                     minibatch_frames[frame_index] = frame
                     minibatch_dates[frame_index] = film.normalized_date
                 end
+
+                train_data_mutex:lock()
                 cross_thread_minibatch_frames[1] = minibatch_frames
                 cross_thread_minibatch_dates[1] = minibatch_dates
                 load_data_mutex:unlock()
@@ -76,26 +82,33 @@ function load_images_async(frame_files, frame_films, minibatch_size, load_data_m
     )
 end
 
-function train_epoch(neural_network, criterion, learning_rate, load_data_mutex, train_data_mutex) 
-
+function train_epoch(learning_rate, load_data_mutex, train_data_mutex, epoch_index) 
     local number_of_frames = count_frames(frame_files)
     local number_of_minibatches = math.floor(number_of_frames / minibatch_size)
 
     local err_sum = 0
     for minibatch_index = 1, number_of_minibatches do
-        update_output("minibatch: " .. minibatch_index)
+
         load_data_mutex:lock()
+
+        print("")
+        print(print_status(minibatch_index, number_of_minibatches, epoch_index, epochs, starting_time, err_sum))
 
         local frame = cross_thread_minibatch_frames[1]
         local date = cross_thread_minibatch_dates[1]
+
+        train_data_mutex:unlock()
+
         local prediction = neural_network:forward(frame)
+
         neural_network:zeroGradParameters()
         local err = criterion:forward(prediction, date)
+        print("pred: ", string.format("%.3f", prediction[1][1]), "date: ", string.format("%.3f", date[1]), "err: ", string.format("%.3f", err))
         err_sum = err_sum + err
+
         local grad_criterion = criterion:backward(prediction, date)
         neural_network:backward(frame, grad_criterion)
         neural_network:updateParameters(learning_rate)
-        train_data_mutex:unlock()
     end
     print("")
     print ("error: ", err_sum / number_of_minibatches * minibatch_size)
@@ -107,13 +120,12 @@ function train_data(frame_dir)
     local frame_size = get_frame_size(frame_dir)
     local input_size = frame_size[1] * frame_size[2] * frame_size[3]
 
-    local neural_network = build_neural_network()
-    local criterion = nn.MSECriterion()
-
     local frame_files, frame_films = build_frame_set(frame_dir)
 
     local load_data_thread_pool = threads.Threads(1, function(thread_id) end)
+
     for epoch_index = 1, epochs do
+
         local load_data_mutex = threads.Mutex()
         local train_data_mutex = threads.Mutex()
         local load_data_mutex_id = load_data_mutex:id()
@@ -121,14 +133,15 @@ function train_data(frame_dir)
         load_data_mutex:lock()
 
         print("epoch " .. epoch_index)
-        load_images_async(frame_files, frame_films, minibatch_size, load_data_mutex_id, train_data_mutex_id, load_data_thread_pool)
-        train_epoch(neural_network, criterion, learning_rate, load_data_mutex, train_data_mutex, load_data_mutex, train_data_mutex)
 
-        adaptive_learning_rate = adaptive_learning_rate * 0.75
+        load_images_async(frame_files, frame_films, load_data_mutex_id, train_data_mutex_id, load_data_thread_pool)
+        train_epoch(adaptive_learning_rate, load_data_mutex, train_data_mutex, epoch_index)
 
         load_data_thread_pool:synchronize()
         load_data_mutex:free()
         train_data_mutex:free()
+
+        adaptive_learning_rate = adaptive_learning_rate * 0.75
     end
 
     load_data_thread_pool:terminate()

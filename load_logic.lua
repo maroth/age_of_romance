@@ -39,7 +39,9 @@ function build_frame_set(frame_dir)
             for frame_file in lfs.dir(frame_dir .. "/" .. film_dir) do
                 if (string.ends(frame_file, ".png")) then
                     index = index + 1
-                    update_output("loading frame : " .. index)
+                    if index % 1000 == 0 then
+                        update_output("loading frame : " .. index)
+                    end
                     frame_files[index] = frame_dir .. film_dir .. "/" .. frame_file
                     frame_films[index] = film
                 end

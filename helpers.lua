@@ -18,3 +18,13 @@ function count_frames(frame_files)
     end
     return number_of_frames
 end
+
+function print_status(minibatch_index, number_of_minibatches, epoch_index, epochs, starting_time, err_sum)
+    local fraction_done  = ((epoch_index - 1) * number_of_minibatches + (minibatch_index - 1)) / (epochs * number_of_minibatches)
+    local elapsed_seconds = os.time() - starting_time
+    local estimated_total_seconds = elapsed_seconds / fraction_done
+    local estimated_remaining_seconds = estimated_total_seconds - elapsed_seconds
+    local estimated_remaining_hours = estimated_remaining_seconds / 60 / 60
+    local err = err_sum / minibatch_index
+    return("minibatch " .. minibatch_index .. " of " .. number_of_minibatches .. ", error rate: " .. string.format("%.3f", err) .. " (" .. string.format("%.3f", fraction_done * 100) .. "%, remaining hours: " .. string.format("%.5f", estimated_remaining_hours) .. ")")
+end

@@ -1,9 +1,14 @@
 require 'nn'
 
-function build_neural_network() 
+local SpatialConvolution = nn.SpatialConvolution
+local SpatialMaxPooling = nn.SpatialMaxPooling
+
+function build_neural_network()
+    return vgg16()
+end
+
+function alexNet()
     -- an AlexNet implementation takes from https://github.com/eladhoffer/ImageNet-Training/blob/master/Models/AlexNet.lua
-    local SpatialConvolution = nn.SpatialConvolution
-    local SpatialMaxPooling = nn.SpatialMaxPooling
 
     local features = nn.Sequential()
     features:add(SpatialConvolution(3,64,11,11,4,4,2,2))       -- 224 -> 55
@@ -37,4 +42,56 @@ function build_neural_network()
     model:add(features):add(classifier)
 
     return model
+end
+
+function vgg16() 
+    -- vgg16 taken from https://arxiv.org/pdf/1409.1556v6.pdf
+    local vgg16 = nn.Sequential()
+
+    vgg16:add(SpatialConvolution(3, 64, 3, 3, 1, 1, 1, 1))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(SpatialConvolution(64, 64, 3, 3, 1, 1, 1, 1))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(SpatialMaxPooling(2, 2, 2, 2))
+
+    vgg16:add(SpatialConvolution(64, 128, 3, 3, 1, 1, 1, 1))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(SpatialConvolution(128, 128, 3, 3, 1, 1, 1, 1))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(SpatialMaxPooling(2, 2, 2, 2))
+
+    vgg16:add(SpatialConvolution(128, 256, 3, 3, 1, 1, 1, 1))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(SpatialConvolution(256, 256, 3, 3, 1, 1, 1, 1))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(SpatialConvolution(256, 256, 3, 3, 1, 1, 1, 1))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(SpatialMaxPooling(2, 2, 2, 2))
+
+    vgg16:add(SpatialConvolution(256, 512, 3, 3, 1, 1, 1, 1))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(SpatialConvolution(512, 512, 3, 3, 1, 1, 1, 1))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(SpatialConvolution(512, 512, 3, 3, 1, 1, 1, 1))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(SpatialMaxPooling(2, 2, 2, 2))
+
+    vgg16:add(SpatialConvolution(512, 512, 3, 3, 1, 1, 1, 1))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(SpatialConvolution(512, 512, 3, 3, 1, 1, 1, 1))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(SpatialConvolution(512, 512, 3, 3, 1, 1, 1, 1))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(SpatialMaxPooling(2, 2, 2, 2))
+
+    vgg16:add(nn.View(512*5*10))
+    vgg16:add(nn.Linear(512*5*10, 4095))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(nn.Linear(4095, 4095))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(nn.Linear(4095, 1000))
+    vgg16:add(nn.ReLU(true))
+    vgg16:add(nn.Linear(1000, 1))
+    vgg16:add(nn.Sigmoid())
+    return vgg16
 end
