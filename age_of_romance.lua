@@ -12,6 +12,14 @@ local threads = require 'threads'
 train_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
 test_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
 
+if arg[1] ~= nil then
+    train_frame_dir = arg[1]
+end
+
+if arg[2] ~= nil then
+    test_frame_dir = arg[2]
+end
+
 local learning_rate = 0.001
 local minibatch_size = 100
 local epochs = 5
