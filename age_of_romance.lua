@@ -31,13 +31,13 @@ local learning_rate = 0.001
 
 -- all images in a minibatch are fed into the network at the same time
 -- optimize this so the network still fits into RAM
-local minibatch_size = 20
+local minibatch_size = 1
 
 -- number of total epochs
-local epochs = 5
+local epochs = 10
 
 -- factor to multiply the learning rate with after each epoch
-local learning_rate_decay = 0.99
+local learning_rate_decay = 0.9
 
 -- set the log theshold
 -- messages with a higher or equal number than this are displayed
@@ -159,30 +159,48 @@ function train_data(frame_dir)
 end
 
 function test_data(neural_network, frame_dir)
+
+    log(10, "\n\nTesting data with files from " .. frame_dir)
     frame_files, frame_films = build_frame_set(frame_dir)
+    log(5, "Number of test frames: " ..  #frame_files)
 
     local number_of_frames = count_frames(frame_files)
     local frame_size = get_frame_size(frame_dir)
 
     local last_film = frame_films[1]
     local sum_prediction = 0
+    local sum_err = 0
     local current_film_frame_count = 0
+    local film_count = 0
+
     for i = 1, number_of_frames do
+        -- load test frame from disk
         local frame = image.load(frame_files[i], 3, 'double')
-        current_film_frame_count = current_film_frame_count + 1
         local film = frame_films[i]
-        neural_network:zeroGradParameters()
-        local prediction = neural_network:forward(frame)
-        sum_prediction = sum_prediction + prediction
+
         if film ~= last_film then
-            last_film = film
+            film_count = film_count + 1
             local average_prediction = sum_prediction / current_film_frame_count
             local denormalized_prediction = denormalize_date(average_prediction)        
             print("")
             print(film.title)
             print("actual date: " .. film.date, "predicted date: " .. denormalized_prediction)
+            sum_prediction = 0
+            current_film_frame_count = 0
+            sum_err = sum_err + math.abs(average_prediction[1] - film.normalized_date[1])
+            last_film = film
         end
+
+        log(1, "feeding frame " .. frame_files[i] .. " to test network")
+        local prediction = neural_network:forward(frame)
+        log(1, "prediction: " .. prediction[1])
+
+        sum_prediction = sum_prediction + prediction
+        current_film_frame_count = current_film_frame_count + 1
     end
+
+    local total_avg_err = sum_err / film_count
+    print ("\n\nTOTAL ERROR: " .. total_avg_err)
 end
 
 -- start a second thread each epoch that loads the image data for the current minibatch while it is being trained on
@@ -201,7 +219,7 @@ function load_images_async(frame_files, frame_films, load_data_mutex_id, train_d
             local image = require 'image'
             require 'helpers'
 
-            set_log_level(4)
+            set_log_level(7)
 
             log(3, "Load thread started")
 
@@ -233,11 +251,14 @@ function load_images_async(frame_files, frame_films, load_data_mutex_id, train_d
                 log(3, "Load thread: starting loading for minibatch " .. minibatch_index)
 
                 -- iterate over input data and fill minibatch tensor
-                for frame_index = 1, minibatch_size do
-                    local frame = image.load(shuffled_frame_files[minibatch_index + frame_index], 3, 'double')
-                    local film = shuffled_frame_films[minibatch_index + frame_index]
-                    minibatch_frames[frame_index] = frame
-                    minibatch_dates[frame_index] = film.normalized_date
+                for intra_minibatch_index = 1, minibatch_size do
+                    local abs_index = minibatch_index + intra_minibatch_index - 1
+                    log(1, "trying to load image to memory: " .. shuffled_frame_files[abs_index])
+                    local frame = image.load(shuffled_frame_files[abs_index], 3, 'double')
+                    local film = shuffled_frame_films[abs_index]
+                    minibatch_frames[intra_minibatch_index] = frame
+                    minibatch_dates[intra_minibatch_index] = film.normalized_date
+                    log(1, "loaded frame with normalized date " .. film.normalized_date[1])
                 end
 
                 log(3, "Load thread: loading complete for minibatch " .. minibatch_index)

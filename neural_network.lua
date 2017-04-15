@@ -11,7 +11,9 @@ function toy()
     local toy = nn.Sequential()
     toy:add(nn.SpatialConvolution(3, 3, 320, 189))
     toy:add(nn.View(3))
-    toy:add(nn.Linear(3, 1))
+    toy:add(nn.Linear(3, 20))
+    toy:add(nn.Tanh())
+    toy:add(nn.Linear(20, 1))
 
     local criterion = nn.MSECriterion();
 
