@@ -30,10 +30,10 @@ end
 
 -- all images in a minibatch are fed into the network at the same time
 -- optimize this so the network still fits into RAM
-local minibatch_size = 30
+local minibatch_size = 20
 
 -- number of total epochs
-local epochs = 10
+local epochs = 5
 
 local sgd_params = {
     learningRate = 0.001,
@@ -41,7 +41,7 @@ local sgd_params = {
     weightDecay = 0,
     dampening = 0,
     nesterov = false,
-    momentum = 0
+    momentum = 0.01
 }
 
 local sgd_state = {}
@@ -49,7 +49,7 @@ local sgd_state = {}
 -- set the log theshold
 -- messages with a higher or equal number than this are displayed
 -- set to 1 or 2 for debugging purposes, 5 or so for actual training
-set_log_level(7)
+set_log_level(8)
 
 -- END CONFIGURATION
 
@@ -60,6 +60,11 @@ local cross_thread_minibatch_dates = tds.Hash()
 -- load the neural network
 local neural_network, criterion = build_neural_network()
 local weights, weight_gradients = neural_network:getParameters()
+
+-- logger for accuracy loggin
+local logger = optim.Logger('accuracy.log')
+logger:setNames{'Training accuracy', 'Testing accuracy'}
+logger:style{'+-', '+-'}
 
 -- remember starting time so we can estimate time till completion during training
 local starting_time = os.time()
@@ -127,6 +132,8 @@ function train_epoch(load_data_mutex, train_data_mutex, epoch_index)
         log(5, minibatch_detail(minibatch_size, prediction, minibatch_dates, err[1]))
     end
 
+    logger:add{err_sum}
+    logger:plot()
     log(10, epoch_summary(epoch_index, epochs, err_sum, minibatch_size, starting_time))
     return err_sum
 end
@@ -217,6 +224,7 @@ function test_data(neural_network, frame_dir)
 
     local total_avg_err = sum_err / film_count
     print ("\n\nTOTAL ERROR: " .. total_avg_err)
+    print ("TOTAL DURATION: " .. os.time() - starting_time)
 end
 
 -- start a second thread each epoch that loads the image data for the current minibatch while it is being trained on
