@@ -15,8 +15,8 @@ threads.Threads.serialization('threads.sharedserialize')
 
 
 -- CONFIGURATION
-train_frame_dir = "/mnt/e/age_of_romance/frames/"
-test_frame_dir = "/mnt/e/age_of_romance/frames/"
+train_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
+test_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
 
 -- command line argument 1 overrides training frame directory
 if arg[1] ~= nil then
@@ -33,7 +33,7 @@ end
 local minibatch_size = 20
 
 -- number of total epochs
-local epochs = 5
+local epochs = 1
 
 local sgd_params = {
     learningRate = 0.001,
@@ -189,11 +189,11 @@ function test_data()
     log(3, "Number of test films: " ..  #films)
 
     local sum_average_error = 0
-    for film_index, film in ipairs(films) do
+    for _, film in pairs(films) do
         local sum_prediction = 0
         local frame_count = 0
         local predictions = {}
-        for frame_index, frame_dir in ipairs(film.frames) do
+        for frame_index, frame_dir in pairs(film.frames) do
             local frame = image.load(frame_dir, 3, 'double')
             log(1, "feeding frame " .. frame_dir .. " to test network")
             local prediction = neural_network:forward(frame)
@@ -201,6 +201,7 @@ function test_data()
             sum_prediction = sum_prediction + prediction[1]
             local err = math.abs((prediction[1] - film.normalized_date)[1])
             frame_count = frame_count + 1
+            print(prediction)
             table.insert(predictions, prediction[1])
         end
 
