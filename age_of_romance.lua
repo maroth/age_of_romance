@@ -34,7 +34,7 @@ local learning_rate = 0.001
 local minibatch_size = 1
 
 -- number of total epochs
-local epochs = 10
+local epochs = 3
 
 -- factor to multiply the learning rate with after each epoch
 local learning_rate_decay = 0.9
@@ -42,7 +42,7 @@ local learning_rate_decay = 0.9
 -- set the log theshold
 -- messages with a higher or equal number than this are displayed
 -- set to 1 or 2 for debugging purposes, 5 or so for actual training
-set_log_level(7)
+set_log_level(9)
 
 -- END CONFIGURATION
 
@@ -183,11 +183,11 @@ function test_data(neural_network, frame_dir)
             local average_prediction = sum_prediction / current_film_frame_count
             local denormalized_prediction = denormalize_date(average_prediction)        
             print("")
-            print(film.title)
-            print("actual date: " .. film.date, "predicted date: " .. denormalized_prediction)
+            print(last_film.title)
+            print("actual date: " .. last_film.date, "predicted date: " .. denormalized_prediction)
             sum_prediction = 0
             current_film_frame_count = 0
-            sum_err = sum_err + math.abs(average_prediction[1] - film.normalized_date[1])
+            sum_err = sum_err + math.abs(average_prediction[1] - last_film.normalized_date[1])
             last_film = film
         end
 
