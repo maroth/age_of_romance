@@ -33,15 +33,15 @@ end
 local minibatch_size = 50
 
 -- number of total epochs
-local epochs = 1
+local epochs = 100
 
 local sgd_params = {
     learningRate = 0.001,
     learningRateDecay = 0.0001,
     weightDecay = 0,
     dampening = 0,
-    nesterov = false,
-    momentum = 0
+    nesterov = 0.9,
+    momentum = 0.9
 }
 
 local sgd_state = {}
@@ -49,7 +49,7 @@ local sgd_state = {}
 -- set the log theshold
 -- messages with a higher or equal number than this are displayed
 -- set to 1 or 2 for debugging purposes, 5 or so for actual training
-set_log_level(7)
+set_log_level(6)
 
 -- END CONFIGURATION
 
@@ -227,6 +227,7 @@ function test_data()
         log(3, "")
         log(3, film.title)
         log(3, "actual date: " .. film.date ..  "\tmean prediction: " .. denormalized_mean .. "\tmedian prediction: " .. denormalized_median)
+        film_logger:plot()
     end
 
     local mean_error = sum_mean_error / #films
@@ -234,7 +235,6 @@ function test_data()
     log(8, "mean of mean error on test set: " .. mean_error)
     log(8, "mean of median error on test set: " .. median_error)
 
-    film_logger:plot()
 
     return mean_error, median_error
 end
@@ -322,5 +322,5 @@ end
 
 -- start training the network
 train_data()
-set_log_level(3)
+set_log_level(5)
 test_data()
