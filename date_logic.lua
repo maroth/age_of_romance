@@ -16,13 +16,17 @@ function normalize_date(date_to_normalize)
         print("ERROR: movie too old")
     end 
     local normalized_date = (date_to_normalize - zero_date) / (one_date - zero_date)
+    normalized_date = normalized_date - 0.5
+    normalized_date = normalized_date * 10
     local normalized_date_tensor = torch.DoubleTensor(1)
     normalized_date_tensor[1] = normalized_date
     return normalized_date_tensor
 end
 
 function denormalize_date(date_to_denormalize)
-    denormalized_date = date_to_denormalize * (one_date - zero_date) + zero_date
+    denormalized_date = date_to_denormalize / 10
+    denormalized_date = denormalized_date + 0.5
+    denormalized_date = denormalized_date * (one_date - zero_date) + zero_date
     date_table = os.date("*t", denormalized_date)
     date_string = date_table.year .. "-" .. date_table.month .. "-" .. date_table.day
     return date_string

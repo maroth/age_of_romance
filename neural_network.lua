@@ -15,25 +15,31 @@ function toy()
     toy:add(nn.Tanh())
     toy:add(nn.Linear(20, 1))
 
-    local criterion = nn.MSECriterion();
+    local criterion = nn.SmoothL1Criterion();
 
     return toy, criterion
 end
 
 function vgg_tiny()
     local vgg = nn.Sequential()
-    vgg:add(SpatialConvolution(3, 64, 3, 3, 1, 1, 1, 1))
+    vgg:add(nn.SpatialConvolution(3, 64, 3, 3, 1, 1, 1, 1))
     vgg:add(nn.ReLU(true))
-    vgg:add(SpatialMaxPooling(2, 2, 2, 2))
+    vgg:add(nn.SpatialMaxPooling(4, 4, 6, 4))
+    vgg:add(nn.SpatialConvolution(64, 128, 3, 3, 1, 1, 1, 1))
+    vgg:add(nn.ReLU(true))
+    vgg:add(nn.SpatialMaxPooling(4, 4, 5, 4))
+    vgg:add(nn.SpatialConvolution(128, 256, 3, 3, 1, 1, 1, 1))
+    vgg:add(nn.ReLU(true))
+    vgg:add(nn.SpatialMaxPooling(8, 8, 8, 8))
+    vgg:add(nn.View(256))
 
-    vgg:add(nn.View(64*94*160))
-    vgg:add(nn.Linear(64*94*160, 100))
+    vgg:add(nn.Linear(256, 256))
     vgg:add(nn.ReLU(true))
-    vgg:add(nn.Linear(100, 10))
+    vgg:add(nn.Linear(256, 50))
     vgg:add(nn.ReLU(true))
-    vgg:add(nn.Linear(10, 1))
+    vgg:add(nn.Linear(50, 1))
 
-    local criterion = nn.MSECriterion()
+    local criterion = nn.SmoothL1Criterion();
 
     return vgg, criterion
 end

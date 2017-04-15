@@ -30,7 +30,7 @@ end
 
 -- all images in a minibatch are fed into the network at the same time
 -- optimize this so the network still fits into RAM
-local minibatch_size = 125
+local minibatch_size = 20
 
 -- number of total epochs
 local epochs = 100
@@ -38,15 +38,15 @@ local epochs = 100
 -- limit the maximum number of files per directory that are read
 -- useful to try out something
 -- set to nil to read all frames
-local max_frames_per_directory = 1
+local max_frames_per_directory = nil
 
 local sgd_params = {
-    learningRate = 0.001,
-    learningRateDecay = 0.001,
+    learningRate = 0.01,
+    learningRateDecay = 0.0001,
     weightDecay = 0,
     dampening = 0,
-    nesterov = 0.9,
-    momentum = 0.9
+    nesterov = false,
+    momentum = 0,
 }
 
 local sgd_state = {}
@@ -54,7 +54,7 @@ local sgd_state = {}
 -- set the log theshold
 -- messages with a higher or equal number than this are displayed
 -- set to 1 or 2 for debugging purposes, 5 or so for actual training
-set_log_level(6)
+set_log_level(8)
 
 -- END CONFIGURATION
 
@@ -68,6 +68,7 @@ local weights, weight_gradients = neural_network:getParameters()
 
 -- logger for accuracy loggin
 local logger = optim.Logger('training_error.log')
+logger:setlogscale()
 logger:setNames{'Training error'}
 logger:style{'+-'}
 
@@ -79,6 +80,10 @@ function train_epoch(load_data_mutex, train_data_mutex, epoch_index)
 
     local number_of_frames = count_frames(frame_files)
     local number_of_minibatches = math.floor(number_of_frames / minibatch_size)
+    if number_of_minibatches == 0 then
+        log(10, "ERROR: frame count smaller than minibatch size")
+        os.exit()
+    end
 
     local err_sum = 0
     for minibatch_index = 1, number_of_minibatches do
@@ -190,7 +195,7 @@ end
 
 function test_data()
     log(3, "\n\nTesting data with files from " .. test_frame_dir)
-    local films = load_films(test_frame_dir)
+    local films = load_films(test_frame_dir, max_frames_per_directory)
     log(3, "Number of test films: " ..  #films)
 
     local sum_mean_error = 0
