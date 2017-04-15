@@ -1,6 +1,8 @@
-require 'image'
 require 'nn'
+require 'optim'
 require 'lfs'
+require 'image'
+
 require 'date_logic'
 require 'load_logic'
 require 'helpers'
@@ -26,23 +28,28 @@ if arg[2] ~= nil then
     test_frame_dir = arg[2]
 end
 
--- learning rate to apply to network
-local learning_rate = 0.001
-
 -- all images in a minibatch are fed into the network at the same time
 -- optimize this so the network still fits into RAM
-local minibatch_size = 20
+local minibatch_size = 30
 
 -- number of total epochs
-local epochs = 3
+local epochs = 10
 
--- factor to multiply the learning rate with after each epoch
-local learning_rate_decay = 0.9
+local sgd_params = {
+    learningRate = 0.001,
+    learningRateDecay = 0.0001,
+    weightDecay = 0,
+    dampening = 0,
+    nesterov = false,
+    momentum = 0
+}
+
+local sgd_state = {}
 
 -- set the log theshold
 -- messages with a higher or equal number than this are displayed
 -- set to 1 or 2 for debugging purposes, 5 or so for actual training
-set_log_level(8)
+set_log_level(7)
 
 -- END CONFIGURATION
 
@@ -52,12 +59,13 @@ local cross_thread_minibatch_dates = tds.Hash()
 
 -- load the neural network
 local neural_network, criterion = build_neural_network()
+local weights, weight_gradients = neural_network:getParameters()
 
 -- remember starting time so we can estimate time till completion during training
 local starting_time = os.time()
 
 -- train a complete epoch, while asynchronously loading image data from the loading thread
-function train_epoch(learning_rate, load_data_mutex, train_data_mutex, epoch_index) 
+function train_epoch(load_data_mutex, train_data_mutex, epoch_index) 
 
     local number_of_frames = count_frames(frame_files)
     local number_of_minibatches = math.floor(number_of_frames / minibatch_size)
@@ -79,43 +87,53 @@ function train_epoch(learning_rate, load_data_mutex, train_data_mutex, epoch_ind
         train_data_mutex:unlock()
         log(1, "Main thread: locked train mutex")
 
-        -- forward the minibatch through the network, getting the prediction
-        local prediction = neural_network:forward(minibatch)
-        log(2, "Fed minibatch " .. minibatch_index .. " into network")
+        local prediction = {}
+        local err = {}
 
-        -- forward the prediction through the criterion to the the error
-        local err = criterion:forward(prediction, minibatch_dates)
-        log(2, "Forwarded prediction for minibatch " .. minibatch_index .. " into criterion, error is " .. err)
+        function feval(new_weights)
+            -- copy new weights, not sure if this is necessary
+            if new_weights ~= weights then
+                weights:copy(new_weights)
+            end
 
-        -- calculate the gradient error by feeding the prediction 
-        -- and the ground truth backwards through the criterion
-        local grad_criterion = criterion:backward(prediction, minibatch_dates)
-        log(2, "Backwarded prediction for minibatch " .. minibatch_index .. " into criterion, mean grad_criterion is " .. grad_criterion:mean())
+            -- reset weight gradients
+            weight_gradients:zero()
 
-        -- zero the gratient parameters from the last run
-        -- (they are left in an accumulated state to accomodate for batch modes)
-        neural_network:zeroGradParameters()
+            -- forward the minibatch through the network, getting the prediction
+            prediction = neural_network:forward(minibatch)
+            log(2, "Fed minibatch " .. minibatch_index .. " into network")
 
-        -- feed the gradients backward through the network
-        neural_network:backward(minibatch, grad_criterion)
+            -- forward the prediction through the criterion to the the error
+            local err = criterion:forward(prediction, minibatch_dates)
+            log(2, "Forwarded prediction for minibatch " .. minibatch_index .. " into criterion, error is " .. err)
 
-        -- update the parameters of the network according the the learning rate
-        neural_network:updateParameters(learning_rate)
+            -- calculate the gradient error by feeding the prediction 
+            -- and the ground truth backwards through the criterion
+            local grad_criterion = criterion:backward(prediction, minibatch_dates)
+            log(2, "Backwarded prediction for minibatch " .. minibatch_index .. " into criterion, mean grad_criterion is " .. grad_criterion:mean())
 
+            -- feed the gradients backward through the network
+            neural_network:backward(minibatch, grad_criterion)
+            
+            return err, weight_gradients
+        end
+
+        local new_weights, err = optim.sgd(feval, weights, sgd_params, sgd_state)
+        
         -- accumulate error for logging purposes
-        err_sum = err_sum + err
+        err_sum = err_sum + err[1]
 
         log(7, minibatch_summary(minibatch_index, number_of_minibatches, epoch_index, epochs, starting_time, err_sum))
-        log(5, minibatch_detail(minibatch_size, prediction, minibatch_dates, err))
+        log(5, minibatch_detail(minibatch_size, prediction, minibatch_dates, err[1]))
     end
 
     log(10, epoch_summary(epoch_index, epochs, err_sum, minibatch_size, starting_time))
+    return err_sum
 end
 
 
 function train_data(frame_dir) 
     log(5, "Starting training on data in directory " .. frame_dir)
-    local adaptive_learning_rate = learning_rate
 
     local frame_size = get_frame_size(frame_dir)
     log(5, "Frame size: " ..  frame_size[1] .. " x " .. frame_size[2] .. " x " .. frame_size[3])
@@ -144,14 +162,12 @@ function train_data(frame_dir)
         log(1, "Main thread: locked load mutex (initial lock)")
 
         load_images_async(frame_files, frame_films, load_data_mutex_id, train_data_mutex_id, load_data_thread_pool)
-        train_epoch(adaptive_learning_rate, load_data_mutex, train_data_mutex, epoch_index)
+        train_epoch(load_data_mutex, train_data_mutex, epoch_index)
 
         load_data_thread_pool:synchronize()
         load_data_mutex:free()
         train_data_mutex:free()
 
-        adaptive_learning_rate = adaptive_learning_rate * learning_rate_decay
-        log(3, "Learning Rate changed to: " ..  adaptive_learning_rate)
     end
 
     load_data_thread_pool:terminate()
