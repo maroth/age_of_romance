@@ -63,7 +63,7 @@ local weights, weight_gradients = neural_network:getParameters()
 
 -- logger for accuracy loggin
 local logger = optim.Logger('accuracy.log')
-logger:setNames{'Training accuracy', 'Testing accuracy'}
+logger:setNames{'Training error', 'Testing error'}
 logger:style{'+-', '+-'}
 
 -- remember starting time so we can estimate time till completion during training
@@ -132,17 +132,15 @@ function train_epoch(load_data_mutex, train_data_mutex, epoch_index)
         log(5, minibatch_detail(minibatch_size, prediction, minibatch_dates, err[1]))
     end
 
-    logger:add{err_sum}
-    logger:plot()
     log(10, epoch_summary(epoch_index, epochs, err_sum, minibatch_size, starting_time))
     return err_sum
 end
 
 
-function train_data(frame_dir) 
-    log(5, "Starting training on data in directory " .. frame_dir)
+function train_data() 
+    log(5, "Starting training on data in directory " .. train_frame_dir)
 
-    local frame_size = get_frame_size(frame_dir)
+    local frame_size = get_frame_size(train_frame_dir)
     log(5, "Frame size: " ..  frame_size[1] .. " x " .. frame_size[2] .. " x " .. frame_size[3])
 
     log(10, "Testing network size compatibility...")
@@ -152,7 +150,7 @@ function train_data(frame_dir)
 
     log(10, "Neural network test success!")
 
-    local frame_files, frame_films = build_frame_set(frame_dir)
+    local frame_files, frame_films = build_frame_set(train_frame_dir)
     log(5, "Number of frames: " ..  #frame_files)
 
     local load_data_thread_pool = threads.Threads(1, function(thread_id) end)
@@ -169,26 +167,29 @@ function train_data(frame_dir)
         log(1, "Main thread: locked load mutex (initial lock)")
 
         load_images_async(frame_files, frame_films, load_data_mutex_id, train_data_mutex_id, load_data_thread_pool)
-        train_epoch(load_data_mutex, train_data_mutex, epoch_index)
+        local train_err = train_epoch(load_data_mutex, train_data_mutex, epoch_index)
 
         load_data_thread_pool:synchronize()
         load_data_mutex:free()
         train_data_mutex:free()
 
+        local test_err = test_data()
+        logger:add{train_err, test_err}
+        logger:plot()
     end
 
     load_data_thread_pool:terminate()
     return neural_network
 end
 
-function test_data(neural_network, frame_dir)
+function test_data()
 
-    log(10, "\n\nTesting data with files from " .. frame_dir)
-    frame_files, frame_films = build_frame_set(frame_dir)
-    log(5, "Number of test frames: " ..  #frame_files)
+    log(3, "\n\nTesting data with files from " .. test_frame_dir)
+    frame_files, frame_films = build_frame_set(test_frame_dir)
+    log(3, "Number of test frames: " ..  #frame_files)
 
     local number_of_frames = count_frames(frame_files)
-    local frame_size = get_frame_size(frame_dir)
+    local frame_size = get_frame_size(test_frame_dir)
 
     local last_film = frame_films[1]
     local sum_prediction = 0
@@ -205,9 +206,9 @@ function test_data(neural_network, frame_dir)
             film_count = film_count + 1
             local average_prediction = sum_prediction / current_film_frame_count
             local denormalized_prediction = denormalize_date(average_prediction)        
-            print("")
-            print(last_film.title)
-            print("actual date: " .. last_film.date, "predicted date: " .. denormalized_prediction)
+            log(3, "")
+            log(3, last_film.title)
+            log(3, "actual date: " .. last_film.date, "predicted date: " .. denormalized_prediction)
             sum_prediction = 0
             current_film_frame_count = 0
             sum_err = sum_err + math.abs(average_prediction[1] - last_film.normalized_date[1])
@@ -223,8 +224,8 @@ function test_data(neural_network, frame_dir)
     end
 
     local total_avg_err = sum_err / film_count
-    print ("\n\nTOTAL ERROR: " .. total_avg_err)
-    print ("TOTAL DURATION: " .. os.time() - starting_time)
+    log(8, "average error on test set: " .. total_avg_err)
+    return sum_err
 end
 
 -- start a second thread each epoch that loads the image data for the current minibatch while it is being trained on
@@ -308,7 +309,4 @@ function load_images_async(frame_files, frame_films, load_data_mutex_id, train_d
 end
 
 -- start training the network
-local neural_network = train_data(train_frame_dir)
-
--- test the network
-test_data(neural_network, test_frame_dir)
+train_data()
