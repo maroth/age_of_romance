@@ -30,14 +30,19 @@ end
 
 -- all images in a minibatch are fed into the network at the same time
 -- optimize this so the network still fits into RAM
-local minibatch_size = 50
+local minibatch_size = 125
 
 -- number of total epochs
 local epochs = 100
 
+-- limit the maximum number of files per directory that are read
+-- useful to try out something
+-- set to nil to read all frames
+local max_frames_per_directory = 1
+
 local sgd_params = {
     learningRate = 0.001,
-    learningRateDecay = 0.0001,
+    learningRateDecay = 0.001,
     weightDecay = 0,
     dampening = 0,
     nesterov = 0.9,
@@ -151,7 +156,7 @@ function train_data()
     sanity_check(test_network, test_criterion, frame_size)
     log(10, "Neural network test success!")
 
-    local frame_files, frame_films = build_frame_set(train_frame_dir)
+    local frame_files, frame_films = build_frame_set(train_frame_dir, max_frames_per_directory)
     log(5, "Number of frames: " ..  #frame_files)
 
     local load_data_thread_pool = threads.Threads(1, function(thread_id) end)

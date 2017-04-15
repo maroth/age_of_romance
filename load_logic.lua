@@ -49,7 +49,7 @@ function load_films(frame_dir)
     return films
 end
 
-function build_frame_set(frame_dir)
+function build_frame_set(frame_dir, max_frames_per_directory)
     local index = 0
     frame_files = {}
     frame_films = {}
@@ -58,14 +58,18 @@ function build_frame_set(frame_dir)
         if file_exists(info_file_path) then
             local film  = parse_info_file(info_file_path)
             film.normalized_date = normalize_date(parse_date(film.date))
+            local frames_count = 0
             for frame_file in lfs.dir(frame_dir .. "/" .. film_dir) do
-                if (string.ends(frame_file, ".png")) then
-                    index = index + 1
-                    if index % 1000 == 0 then
-                        update_output("loading frame : " .. index)
+                if max_frames_per_directory == nil or max_frames_per_directory >= frames_count then
+                    if (string.ends(frame_file, ".png")) then
+                        frames_count = frames_count + 1
+                        index = index + 1
+                        if index % 1000 == 0 then
+                            update_output("loading frame: " .. index)
+                        end
+                        frame_files[index] = frame_dir .. film_dir .. "/" .. frame_file
+                        frame_films[index] = film
                     end
-                    frame_files[index] = frame_dir .. film_dir .. "/" .. frame_file
-                    frame_films[index] = film
                 end
             end
         end

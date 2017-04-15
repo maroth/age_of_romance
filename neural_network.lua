@@ -4,7 +4,7 @@ local SpatialConvolution = nn.SpatialConvolution
 local SpatialMaxPooling = nn.SpatialMaxPooling
 
 function build_neural_network()
-    return toy()
+    return vgg_tiny()
 end
 
 function toy()
@@ -33,7 +33,7 @@ function vgg_tiny()
     vgg:add(nn.ReLU(true))
     vgg:add(nn.Linear(10, 1))
 
-    local criterion = nn.AbsCriterion()
+    local criterion = nn.MSECriterion()
 
     return vgg, criterion
 end
