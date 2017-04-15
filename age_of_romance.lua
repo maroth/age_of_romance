@@ -42,7 +42,7 @@ local learning_rate_decay = 0.99
 -- set the log theshold
 -- messages with a higher or equal number than this are displayed
 -- set to 1 or 2 for debugging purposes, 5 or so for actual training
-set_log_level(1)
+set_log_level(7)
 
 -- END CONFIGURATION
 
@@ -105,10 +105,11 @@ function train_epoch(learning_rate, load_data_mutex, train_data_mutex, epoch_ind
         -- accumulate error for logging purposes
         err_sum = err_sum + err
 
-        log(7, minibatch_summary(minibatch_size, prediction, minibatch_dates, err))
+        log(7, minibatch_summary(minibatch_index, number_of_minibatches, epoch_index, epochs, starting_time, err_sum))
+        log(5, minibatch_detail(minibatch_size, prediction, minibatch_dates, err))
     end
 
-    log(5, epoch_summary(minibatch_index, number_of_minibatches, epoch_index, epochs, starting_time, err_sum))
+    log(10, epoch_summary(err_sum, minibatch_size))
 end
 
 

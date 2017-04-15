@@ -19,7 +19,7 @@ function count_frames(frame_files)
     return number_of_frames
 end
 
-function epoch_summary(minibatch_index, number_of_minibatches, epoch_index, epochs, starting_time, err_sum)
+function minibatch_summary(minibatch_index, number_of_minibatches, epoch_index, epochs, starting_time, err_sum)
     local fraction_done  = ((epoch_index - 1) * number_of_minibatches + (minibatch_index - 1)) / (epochs * number_of_minibatches)
     local elapsed_seconds = os.time() - starting_time
     local estimated_total_seconds = elapsed_seconds / fraction_done
@@ -29,7 +29,7 @@ function epoch_summary(minibatch_index, number_of_minibatches, epoch_index, epoc
     return("[" .. epoch_index .. "/" .. epochs .. "] " .. " minibatch " .. minibatch_index .. " of " .. number_of_minibatches .. ", error rate: " .. string.format("%.3f", err) .. " (" .. string.format("%.3f", fraction_done * 100) .. "%, remaining hours: " .. string.format("%.5f", estimated_remaining_hours) .. ")")
 end
 
-function minibatch_summary(minibatch_size, prediction, minibatch_dates, err)
+function minibatch_detail(minibatch_size, prediction, minibatch_dates, err)
     local message = ""
     for i = 1, minibatch_size do
         message = message .. "\nprediction: " .. string.format("%.3f", prediction[i][1])
@@ -38,6 +38,10 @@ function minibatch_summary(minibatch_size, prediction, minibatch_dates, err)
         message = message .. " \terror: " .. string.format("%.3f", err)
     end
     return message
+end
+
+function epoch_summary(err_sum, minibatch_size)
+    return "Error rate: " .. err_sum / minibatch_size
 end
 
 
