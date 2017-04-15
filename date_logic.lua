@@ -22,8 +22,9 @@ function normalize_date(date_to_normalize)
 end
 
 function denormalize_date(date_to_denormalize)
-    denormalized_date = date_to_denormalize[1] * (one_date - zero_date) + zero_date
+    denormalized_date = date_to_denormalize * (one_date - zero_date) + zero_date
     date_table = os.date("*t", denormalized_date)
     date_string = date_table.year .. "-" .. date_table.month .. "-" .. date_table.day
     return date_string
 end
+

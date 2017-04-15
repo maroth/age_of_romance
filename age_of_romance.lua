@@ -15,8 +15,8 @@ threads.Threads.serialization('threads.sharedserialize')
 
 
 -- CONFIGURATION
-train_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
-test_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
+train_frame_dir = "/mnt/e/age_of_romance/mini_frames_train/"
+test_frame_dir = "/mnt/e/age_of_romance/mini_frames_test/"
 
 -- command line argument 1 overrides training frame directory
 if arg[1] ~= nil then
@@ -30,7 +30,7 @@ end
 
 -- all images in a minibatch are fed into the network at the same time
 -- optimize this so the network still fits into RAM
-local minibatch_size = 20
+local minibatch_size = 50
 
 -- number of total epochs
 local epochs = 1
@@ -188,7 +188,13 @@ function test_data()
     local films = load_films(test_frame_dir)
     log(3, "Number of test films: " ..  #films)
 
-    local sum_average_error = 0
+    local sum_mean_error = 0
+    local sum_median_error = 0
+
+    local film_logger = optim.Logger('results.log')
+    film_logger:setNames{'Truth', 'Mean Prediction', 'Median Prediction'}
+    film_logger:style{'+-', '+-', '+-', '+-'}
+
     for _, film in pairs(films) do
         local sum_prediction = 0
         local frame_count = 0
@@ -201,34 +207,36 @@ function test_data()
             sum_prediction = sum_prediction + prediction[1]
             local err = math.abs((prediction[1] - film.normalized_date)[1])
             frame_count = frame_count + 1
-            print(prediction)
             table.insert(predictions, prediction[1])
         end
 
-        local average_prediction = sum_prediction / frame_count
-
-        local film_logger = optim.Logger(film.title .. '.log')
-        film_logger:setNames{'Predictions per frame', 'Average Prediction', 'Median Prediction', 'True age'}
-        film_logger:style{'+-', '+', '+', '+'}
+        local mean_prediction = sum_prediction / frame_count
         local median_prediction = median(predictions)
-        for i, prediction in ipairs(predictions) do
-            film_logger:add{prediction, average_prediction, median_prediction, film.normalized_date[1]}
-        end
-        film_logger:plot()
 
-        local average_prediction_tensor = torch.DoubleTensor(1)
-        average_prediction_tensor[1] = average_prediction
-        local denormalized_prediction = denormalize_date(average_prediction_tensor)
-        local film_average_error = math.abs((average_prediction - film.normalized_date)[1])
-        sum_average_error = sum_average_error + film_average_error
+        local denormalized_mean = denormalize_date(mean_prediction)
+        local denormalized_median = denormalize_date(median_prediction)
+
+        local film_mean_error = math.abs((mean_prediction - film.normalized_date)[1])
+        local film_median_error = math.abs((median_prediction - film.normalized_date)[1])
+        
+        sum_mean_error = sum_mean_error + film_mean_error
+        sum_median_error = sum_median_error + film_median_error
+
+        film_logger:add{film.normalized_date[1], mean_prediction, median_prediction}
 
         log(3, "")
         log(3, film.title)
-        log(3, "actual date: " .. film.date ..  "\tpredicted date: " .. denormalized_prediction)
+        log(3, "actual date: " .. film.date ..  "\tmean prediction: " .. denormalized_mean .. "\tmedian prediction: " .. denormalized_median)
     end
-    local average_error = sum_average_error / #films
-    log(8, "average error on test set: " .. average_error)
-    return average_error
+
+    local mean_error = sum_mean_error / #films
+    local median_error = sum_median_error / #films
+    log(8, "mean of mean error on test set: " .. mean_error)
+    log(8, "mean of median error on test set: " .. median_error)
+
+    film_logger:plot()
+
+    return mean_error, median_error
 end
 
 -- start a second thread each epoch that loads the image data for the current minibatch while it is being trained on
