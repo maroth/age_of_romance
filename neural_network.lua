@@ -4,44 +4,71 @@ local SpatialConvolution = nn.SpatialConvolution
 local SpatialMaxPooling = nn.SpatialMaxPooling
 
 function build_neural_network()
-    return vgg16()
+    return toy()
 end
 
-function alexNet()
-    -- an AlexNet implementation takes from https://github.com/eladhoffer/ImageNet-Training/blob/master/Models/AlexNet.lua
+function toy()
+    local toy = nn.Sequential()
+    toy:add(nn.SpatialConvolution(3, 3, 320, 189))
+    toy:add(nn.View(3))
+    toy:add(nn.Linear(3, 1))
 
-    local features = nn.Sequential()
-    features:add(SpatialConvolution(3,64,11,11,4,4,2,2))       -- 224 -> 55
-    features:add(nn.ReLU(true))
-    features:add(SpatialMaxPooling(3,3,2,2))                   -- 55 ->  27
-    features:add(SpatialConvolution(64,192,5,5,1,1,2,2))       --  27 -> 27
-    features:add(nn.ReLU(true))
-    features:add(SpatialMaxPooling(3,3,2,2))                   --  27 ->  13
-    features:add(SpatialConvolution(192,384,3,3,1,1,1,1))      --  13 ->  13
-    features:add(nn.ReLU(true))
-    features:add(SpatialConvolution(384,256,3,3,1,1,1,1))      --  13 ->  13
-    features:add(nn.ReLU(true))
-    features:add(SpatialConvolution(256,256,3,3,1,1,1,1))      --  13 ->  13
-    features:add(nn.ReLU(true))
-    features:add(SpatialMaxPooling(3,3,2,2))                   -- 13 -> 6
+    local criterion = nn.MSECriterion();
 
-    local classifier = nn.Sequential()
-    classifier:add(nn.View(256*6*6))
-    classifier:add(nn.Dropout(0.5))
-    classifier:add(nn.Linear(256*6*6, 4096))
-    --classifier:add(nn.Threshold(0, 1e-6))
-    classifier:add(nn.Dropout(0.5))
-    classifier:add(nn.Linear(4096, 4096))
-    --classifier:add(nn.Threshold(0, 1e-6))
-    classifier:add(nn.Linear(4096, 1000))
-    classifier:add(nn.Linear(1000, 100))
-    classifier:add(nn.Linear(100, 1))
-    --classifier:add(nn.Sigmoid())
+    return toy, criterion
+end
 
-    local model = nn.Sequential()
-    model:add(features):add(classifier)
+function vgg_tiny()
+    local vgg = nn.Sequential()
+    vgg:add(SpatialConvolution(3, 64, 3, 3, 1, 1, 1, 1))
+    vgg:add(nn.ReLU(true))
+    vgg:add(SpatialMaxPooling(2, 2, 2, 2))
 
-    return model
+    vgg:add(nn.View(64*94*160))
+    vgg:add(nn.Linear(64*94*160, 100))
+    vgg:add(nn.ReLU(true))
+    vgg:add(nn.Linear(100, 10))
+    vgg:add(nn.ReLU(true))
+    vgg:add(nn.Linear(10, 1))
+
+    local criterion = nn.AbsCriterion()
+
+    return vgg, criterion
+end
+
+function vgg_mini() 
+    -- vgg16 taken from https://arxiv.org/pdf/1409.1556v6.pdf
+    local vgg = nn.Sequential()
+
+    vgg:add(SpatialConvolution(3, 64, 3, 3, 1, 1, 1, 1))
+    vgg:add(nn.ReLU(true))
+    vgg:add(SpatialMaxPooling(2, 2, 2, 2))
+
+    vgg:add(SpatialConvolution(64, 128, 3, 3, 1, 1, 1, 1))
+    vgg:add(nn.ReLU(true))
+    vgg:add(SpatialMaxPooling(2, 2, 2, 2))
+
+    vgg:add(SpatialConvolution(128, 256, 3, 3, 1, 1, 1, 1))
+    vgg:add(nn.ReLU(true))
+    vgg:add(SpatialMaxPooling(2, 2, 2, 2))
+
+    vgg:add(SpatialConvolution(256, 512, 3, 3, 1, 1, 1, 1))
+    vgg:add(nn.ReLU(true))
+    vgg:add(SpatialMaxPooling(2, 2, 2, 2))
+
+    vgg:add(nn.View(512*11*20))
+    vgg:add(nn.Linear(512*11*20, 4095))
+    vgg:add(nn.ReLU(true))
+    vgg:add(nn.Linear(4095, 4095))
+    vgg:add(nn.ReLU(true))
+    vgg:add(nn.Linear(4095, 1000))
+    vgg:add(nn.ReLU(true))
+    vgg:add(nn.Linear(1000, 1))
+
+    local criterion = nn.AbsCriterion()
+
+    return vgg, criterion
+
 end
 
 function vgg16() 
