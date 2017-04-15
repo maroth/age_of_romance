@@ -73,3 +73,18 @@ function log(log_level, message)
         print(message)
     end
 end
+
+function median(list)
+    local temp = {}
+    for key, value in pairs(list) do
+        if type(value) == 'number' then
+            table.insert(temp, value)
+        end
+    end
+    table.sort(temp)
+    if math.fmod(#temp, 2) == 0 then
+        return (temp[#temp/2] + temp[(#temp / 2) + 1]) / 2
+    else
+        return temp[math.ceil(#temp / 2)]
+    end
+end

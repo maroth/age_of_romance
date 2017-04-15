@@ -1,3 +1,7 @@
+# logs and repors
+*.log
+*.eps
+
 # Compiled Lua sources
 luac.out
 

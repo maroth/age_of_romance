@@ -15,8 +15,8 @@ threads.Threads.serialization('threads.sharedserialize')
 
 
 -- CONFIGURATION
-train_frame_dir = "/mnt/e/age_of_romance/sanity_check/"
-test_frame_dir = "/mnt/e/age_of_romance/sanity_check/"
+train_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
+test_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
 
 -- command line argument 1 overrides training frame directory
 if arg[1] ~= nil then
@@ -33,7 +33,7 @@ end
 local minibatch_size = 20
 
 -- number of total epochs
-local epochs = 5
+local epochs = 1
 
 local sgd_params = {
     learningRate = 0.001,
@@ -41,7 +41,7 @@ local sgd_params = {
     weightDecay = 0,
     dampening = 0,
     nesterov = false,
-    momentum = 0.01
+    momentum = 0
 }
 
 local sgd_state = {}
@@ -62,9 +62,9 @@ local neural_network, criterion = build_neural_network()
 local weights, weight_gradients = neural_network:getParameters()
 
 -- logger for accuracy loggin
-local logger = optim.Logger('accuracy.log')
-logger:setNames{'Training error', 'Testing error'}
-logger:style{'+-', '+-'}
+local logger = optim.Logger('training_error.log')
+logger:setNames{'Training error'}
+logger:style{'+-'}
 
 -- remember starting time so we can estimate time till completion during training
 local starting_time = os.time()
@@ -145,9 +145,7 @@ function train_data()
 
     log(10, "Testing network size compatibility...")
     local test_network, test_criterion  = build_neural_network()
-
     sanity_check(test_network, test_criterion, frame_size)
-
     log(10, "Neural network test success!")
 
     local frame_files, frame_films = build_frame_set(train_frame_dir)
@@ -173,8 +171,8 @@ function train_data()
         load_data_mutex:free()
         train_data_mutex:free()
 
-        local test_err = test_data()
-        logger:add{train_err, test_err}
+        --local test_err = test_data()
+        logger:add{train_err}
         logger:plot()
     end
 
@@ -183,49 +181,50 @@ function train_data()
 end
 
 function test_data()
-
     log(3, "\n\nTesting data with files from " .. test_frame_dir)
-    frame_files, frame_films = build_frame_set(test_frame_dir)
-    log(3, "Number of test frames: " ..  #frame_files)
+    local films = load_films(test_frame_dir)
+    log(3, "Number of test films: " ..  #films)
 
-    local number_of_frames = count_frames(frame_files)
-    local frame_size = get_frame_size(test_frame_dir)
-
-    local last_film = frame_films[1]
-    local sum_prediction = 0
-    local sum_err = 0
-    local current_film_frame_count = 0
-    local film_count = 0
-
-    for i = 1, number_of_frames do
-        -- load test frame from disk
-        local frame = image.load(frame_files[i], 3, 'double')
-        local film = frame_films[i]
-
-        if film ~= last_film then
-            film_count = film_count + 1
-            local average_prediction = sum_prediction / current_film_frame_count
-            local denormalized_prediction = denormalize_date(average_prediction)        
-            log(3, "")
-            log(3, last_film.title)
-            log(3, "actual date: " .. last_film.date, "predicted date: " .. denormalized_prediction)
-            sum_prediction = 0
-            current_film_frame_count = 0
-            sum_err = sum_err + math.abs(average_prediction[1] - last_film.normalized_date[1])
-            last_film = film
+    local sum_average_error = 0
+    for film_index, film in ipairs(films) do
+        local sum_prediction = 0
+        local frame_count = 0
+        local predictions = {}
+        for frame_index, frame_dir in ipairs(film.frames) do
+            local frame = image.load(frame_dir, 3, 'double')
+            log(1, "feeding frame " .. frame_dir .. " to test network")
+            local prediction = neural_network:forward(frame)
+            log(1, "prediction: " .. prediction[1])
+            sum_prediction = sum_prediction + prediction[1]
+            local err = math.abs((prediction[1] - film.normalized_date)[1])
+            frame_count = frame_count + 1
+            table.insert(predictions, prediction[1])
         end
 
-        log(1, "feeding frame " .. frame_files[i] .. " to test network")
-        local prediction = neural_network:forward(frame)
-        log(1, "prediction: " .. prediction[1])
+        local average_prediction = sum_prediction / frame_count
 
-        sum_prediction = sum_prediction + prediction
-        current_film_frame_count = current_film_frame_count + 1
+        local film_logger = optim.Logger(film.title .. '.log')
+        film_logger:setNames{'Predictions per frame', 'Average Prediction', 'Median Prediction', 'True age'}
+        film_logger:style{'+-', '+', '+', '+'}
+        local median_prediction = median(predictions)
+        for i, prediction in ipairs(predictions) do
+            film_logger:add{prediction, average_prediction, median_prediction, film.normalized_date[1]}
+        end
+        film_logger:plot()
+
+        local average_prediction_tensor = torch.DoubleTensor(1)
+        average_prediction_tensor[1] = average_prediction
+        local denormalized_prediction = denormalize_date(average_prediction_tensor)
+        local film_average_error = math.abs((average_prediction - film.normalized_date)[1])
+        sum_average_error = sum_average_error + film_average_error
+
+        log(3, "")
+        log(3, film.title)
+        log(3, "actual date: " .. film.date ..  "\tpredicted date: " .. denormalized_prediction)
     end
-
-    local total_avg_err = sum_err / film_count
-    log(8, "average error on test set: " .. total_avg_err)
-    return sum_err
+    local average_error = sum_average_error / #films
+    log(8, "average error on test set: " .. average_error)
+    return average_error
 end
 
 -- start a second thread each epoch that loads the image data for the current minibatch while it is being trained on
@@ -310,3 +309,5 @@ end
 
 -- start training the network
 train_data()
+set_log_level(3)
+test_data()
