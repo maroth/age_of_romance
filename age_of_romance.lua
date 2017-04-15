@@ -15,8 +15,8 @@ threads.Threads.serialization('threads.sharedserialize')
 
 
 -- CONFIGURATION
-train_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
-test_frame_dir = "/mnt/e/age_of_romance/mini_frames/"
+train_frame_dir = "/mnt/e/age_of_romance/frames/"
+test_frame_dir = "/mnt/e/age_of_romance/frames/"
 
 -- command line argument 1 overrides training frame directory
 if arg[1] ~= nil then
@@ -33,7 +33,7 @@ end
 local minibatch_size = 20
 
 -- number of total epochs
-local epochs = 1
+local epochs = 5
 
 local sgd_params = {
     learningRate = 0.001,
@@ -49,7 +49,7 @@ local sgd_state = {}
 -- set the log theshold
 -- messages with a higher or equal number than this are displayed
 -- set to 1 or 2 for debugging purposes, 5 or so for actual training
-set_log_level(8)
+set_log_level(7)
 
 -- END CONFIGURATION
 
@@ -91,6 +91,9 @@ function train_epoch(load_data_mutex, train_data_mutex, epoch_index)
         -- unlock the train mutex so the loading thread can start loading the next minibatch
         train_data_mutex:unlock()
         log(1, "Main thread: locked train mutex")
+
+        collectgarbage()
+        collectgarbage()
 
         local prediction = {}
         local err = {}
@@ -301,6 +304,7 @@ function load_images_async(frame_files, frame_films, load_data_mutex_id, train_d
                 log(1, "Load thread: unlocked load mutex")
 
                 -- garbage collection so our RAM usage stays low
+                collectgarbage()
                 collectgarbage()
             end
         end
