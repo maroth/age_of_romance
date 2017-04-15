@@ -31,7 +31,7 @@ local learning_rate = 0.001
 
 -- all images in a minibatch are fed into the network at the same time
 -- optimize this so the network still fits into RAM
-local minibatch_size = 1
+local minibatch_size = 20
 
 -- number of total epochs
 local epochs = 3
@@ -42,7 +42,7 @@ local learning_rate_decay = 0.9
 -- set the log theshold
 -- messages with a higher or equal number than this are displayed
 -- set to 1 or 2 for debugging purposes, 5 or so for actual training
-set_log_level(9)
+set_log_level(8)
 
 -- END CONFIGURATION
 
@@ -109,7 +109,7 @@ function train_epoch(learning_rate, load_data_mutex, train_data_mutex, epoch_ind
         log(5, minibatch_detail(minibatch_size, prediction, minibatch_dates, err))
     end
 
-    log(10, epoch_summary(err_sum, minibatch_size))
+    log(10, epoch_summary(epoch_index, epochs, err_sum, minibatch_size, starting_time))
 end
 
 

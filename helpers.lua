@@ -19,14 +19,20 @@ function count_frames(frame_files)
     return number_of_frames
 end
 
-function minibatch_summary(minibatch_index, number_of_minibatches, epoch_index, epochs, starting_time, err_sum)
-    local fraction_done  = ((epoch_index - 1) * number_of_minibatches + (minibatch_index - 1)) / (epochs * number_of_minibatches)
+function get_remaining_hours(starting_time, fraction_done)
     local elapsed_seconds = os.time() - starting_time
     local estimated_total_seconds = elapsed_seconds / fraction_done
     local estimated_remaining_seconds = estimated_total_seconds - elapsed_seconds
     local estimated_remaining_hours = estimated_remaining_seconds / 60 / 60
+    return estimated_remaining_hours
+end
+
+function minibatch_summary(minibatch_index, number_of_minibatches, epoch_index, epochs, starting_time, err_sum)
+    local fraction_done  = ((epoch_index - 1) * number_of_minibatches + (minibatch_index - 1)) / (epochs * number_of_minibatches)
+    local estimated_remaining_hours = get_remaining_hours(starting_time, fraction_done)
     local err = err_sum / minibatch_index * 1000
-    return("[" .. epoch_index .. "/" .. epochs .. "] " .. " minibatch " .. minibatch_index .. " of " .. number_of_minibatches .. ", error rate: " .. string.format("%.5f", err) .. " (" .. string.format("%.3f", fraction_done * 100) .. "%, remaining hours: " .. string.format("%.5f", estimated_remaining_hours) .. ")")
+    message = ("[" .. epoch_index .. "/" .. epochs .. "] " .. " minibatch " .. minibatch_index .. " of " .. number_of_minibatches .. ", error rate: " .. string.format("%.5f", err) .. " (" .. string.format("%.3f", fraction_done * 100) .. "%, remaining hours: " .. string.format("%.5f", estimated_remaining_hours) .. ")")
+    return message
 end
 
 function minibatch_detail(minibatch_size, prediction, minibatch_dates, err)
@@ -46,8 +52,14 @@ function minibatch_detail(minibatch_size, prediction, minibatch_dates, err)
     return message
 end
 
-function epoch_summary(err_sum, minibatch_size)
-    return "Error rate: " .. err_sum / minibatch_size
+function epoch_summary(epoch_index, epochs, err_sum, minibatch_size, starting_time)
+    local fraction_done = epoch_index / epochs
+    local estimated_remaining_hours = get_remaining_hours(starting_time, fraction_done)
+    local message = "\nEPOCH " .. epoch_index .. " OF " .. epochs .. " COMPLETED"
+    message = message .. "\nError rate: " .. err_sum / minibatch_size
+    message = message .. "\nRemaining hours: " .. string.format("%.3f", estimated_remaining_hours)
+    message = message .. "\n"
+    return message
 end
 
 
