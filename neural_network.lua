@@ -4,7 +4,7 @@ local SpatialConvolution = nn.SpatialConvolution
 local SpatialMaxPooling = nn.SpatialMaxPooling
 
 function build_neural_network()
-    return vgg_tiny()
+    return vgg_micro()
 end
 
 function toy()
@@ -20,24 +20,48 @@ function toy()
     return toy, criterion
 end
 
+function vgg_micro()
+    local vgg = nn.Sequential()
+    vgg:add(nn.SpatialAveragePooling(9, 10, 5, 6))
+    vgg:add(nn.SpatialConvolution(3, 16, 3, 3, 1, 1, 1, 1))
+    vgg:add(nn.ReLU(true))
+    vgg:add(nn.SpatialAveragePooling(3, 3, 3, 3))
+    vgg:add(nn.SpatialConvolution(16, 32, 3, 3, 1, 1, 1, 1))
+    vgg:add(nn.ReLU(true))
+    vgg:add(nn.SpatialAveragePooling(6, 3, 6, 3))
+    vgg:add(nn.SpatialConvolution(32, 64, 3, 3, 1, 1, 1, 1))
+    vgg:add(nn.ReLU(true))
+
+    vgg:add(nn.View(64))
+    vgg:add(nn.Linear(64, 6))
+    vgg:add(nn.Linear(6, 1))
+
+    local criterion = nn.MSECriterion();
+
+    return vgg, criterion
+end
+
 function vgg_tiny()
     local vgg = nn.Sequential()
-    vgg:add(nn.SpatialConvolution(3, 64, 3, 3, 1, 1, 1, 1))
+    nn.SpatialBatchNormalization(3)
+    vgg:add(nn.SpatialConvolution(3, 9, 3, 3, 1, 1, 1, 1))
     vgg:add(nn.ReLU(true))
+    nn.SpatialBatchNormalization(3)
     vgg:add(nn.SpatialMaxPooling(4, 4, 6, 4))
-    vgg:add(nn.SpatialConvolution(64, 128, 3, 3, 1, 1, 1, 1))
+    vgg:add(nn.SpatialConvolution(9, 18, 3, 3, 1, 1, 1, 1))
+    nn.SpatialBatchNormalization(3)
     vgg:add(nn.ReLU(true))
     vgg:add(nn.SpatialMaxPooling(4, 4, 5, 4))
-    vgg:add(nn.SpatialConvolution(128, 256, 3, 3, 1, 1, 1, 1))
+    vgg:add(nn.SpatialConvolution(18, 27, 3, 3, 1, 1, 1, 1))
+    nn.SpatialBatchNormalization(3)
     vgg:add(nn.ReLU(true))
     vgg:add(nn.SpatialMaxPooling(8, 8, 8, 8))
-    vgg:add(nn.View(256))
 
-    vgg:add(nn.Linear(256, 256))
+    vgg:add(nn.View(27))
     vgg:add(nn.ReLU(true))
-    vgg:add(nn.Linear(256, 50))
+    vgg:add(nn.Linear(27, 25))
     vgg:add(nn.ReLU(true))
-    vgg:add(nn.Linear(50, 1))
+    vgg:add(nn.Linear(25, 1))
 
     local criterion = nn.SmoothL1Criterion();
 

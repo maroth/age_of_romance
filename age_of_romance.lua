@@ -13,50 +13,7 @@ local tds = require 'tds'
 local threads = require 'threads'
 threads.Threads.serialization('threads.sharedserialize')
 
-
--- CONFIGURATION
-train_frame_dir = "/mnt/e/age_of_romance/mini_frames_train/"
-test_frame_dir = "/mnt/e/age_of_romance/mini_frames_test/"
-
--- command line argument 1 overrides training frame directory
-if arg[1] ~= nil then
-    train_frame_dir = arg[1]
-end
-
--- command line argument 2 overrides testing frame directory
-if arg[2] ~= nil then
-    test_frame_dir = arg[2]
-end
-
--- all images in a minibatch are fed into the network at the same time
--- optimize this so the network still fits into RAM
-local minibatch_size = 20
-
--- number of total epochs
-local epochs = 100
-
--- limit the maximum number of files per directory that are read
--- useful to try out something
--- set to nil to read all frames
-local max_frames_per_directory = nil
-
-local sgd_params = {
-    learningRate = 0.01,
-    learningRateDecay = 0.0001,
-    weightDecay = 0,
-    dampening = 0,
-    nesterov = false,
-    momentum = 0,
-}
-
 local sgd_state = {}
-
--- set the log theshold
--- messages with a higher or equal number than this are displayed
--- set to 1 or 2 for debugging purposes, 5 or so for actual training
-set_log_level(8)
-
--- END CONFIGURATION
 
 -- initialize cross-thread variables for minibatch exchange
 local cross_thread_minibatch_frames = tds.Hash()
@@ -75,11 +32,53 @@ logger:style{'+-'}
 -- remember starting time so we can estimate time till completion during training
 local starting_time = os.time()
 
+function train_data(params, train_frame_dir) 
+    set_log_level(params.log_level)
+    log(5, "Starting training on data in directory " .. train_frame_dir)
+
+    local frame_size = get_frame_size(train_frame_dir)
+    log(5, "Frame size: " ..  frame_size[1] .. " x " .. frame_size[2] .. " x " .. frame_size[3])
+
+    log(10, "Testing network size compatibility...")
+    local test_network, test_criterion  = build_neural_network()
+    sanity_check(test_network, test_criterion, frame_size)
+    log(10, "Neural network test success!")
+
+    local frame_files, frame_films = build_frame_set(train_frame_dir, params.max_frames_per_directory)
+    log(5, "Number of frames: " ..  #frame_files)
+
+    local load_data_thread_pool = threads.Threads(1, function(thread_id) end)
+
+    for epoch_index = 1, params.epochs do
+        log(3, "\nStarting epoch " .. epoch_index)
+
+        local load_data_mutex = threads.Mutex()
+        local train_data_mutex = threads.Mutex()
+        local load_data_mutex_id = load_data_mutex:id()
+        local train_data_mutex_id = train_data_mutex:id()
+        log(1, "Main thread: waiting for load mutex")
+        load_data_mutex:lock()
+        log(1, "Main thread: locked load mutex (initial lock)")
+
+        load_images_async(params, frame_files, frame_films, load_data_mutex_id, train_data_mutex_id, load_data_thread_pool)
+        local train_err = train_epoch(params, load_data_mutex, train_data_mutex, epoch_index)
+
+        load_data_thread_pool:synchronize()
+        load_data_mutex:free()
+        train_data_mutex:free()
+
+    end
+
+    load_data_thread_pool:terminate()
+    return neural_network
+end
+
+
 -- train a complete epoch, while asynchronously loading image data from the loading thread
-function train_epoch(load_data_mutex, train_data_mutex, epoch_index) 
+function train_epoch(params, load_data_mutex, train_data_mutex, epoch_index) 
 
     local number_of_frames = count_frames(frame_files)
-    local number_of_minibatches = math.floor(number_of_frames / minibatch_size)
+    local number_of_minibatches = math.floor(number_of_frames / params.minibatch_size)
     if number_of_minibatches == 0 then
         log(10, "ERROR: frame count smaller than minibatch size")
         os.exit()
@@ -136,66 +135,26 @@ function train_epoch(load_data_mutex, train_data_mutex, epoch_index)
             return err, weight_gradients
         end
 
-        local new_weights, err = optim.sgd(feval, weights, sgd_params, sgd_state)
+        local new_weights, err = optim.sgd(feval, weights, params, sgd_state)
         
         -- accumulate error for logging purposes
         err_sum = err_sum + err[1]
 
-        log(7, minibatch_summary(minibatch_index, number_of_minibatches, epoch_index, epochs, starting_time, err_sum))
-        log(5, minibatch_detail(minibatch_size, prediction, minibatch_dates, err[1]))
+        log(7, minibatch_summary(minibatch_index, number_of_minibatches, epoch_index, params.epochs, starting_time, err_sum))
+        log(5, minibatch_detail(params.minibatch_size, prediction, minibatch_dates, err[1]))
     end
 
-    log(10, epoch_summary(epoch_index, epochs, err_sum, minibatch_size, starting_time))
+    logger:add{err_sum}
+    logger:plot()
+
+    log(10, epoch_summary(epoch_index, params.epochs, err_sum, params.minibatch_size, starting_time))
     return err_sum
 end
 
 
-function train_data() 
-    log(5, "Starting training on data in directory " .. train_frame_dir)
-
-    local frame_size = get_frame_size(train_frame_dir)
-    log(5, "Frame size: " ..  frame_size[1] .. " x " .. frame_size[2] .. " x " .. frame_size[3])
-
-    log(10, "Testing network size compatibility...")
-    local test_network, test_criterion  = build_neural_network()
-    sanity_check(test_network, test_criterion, frame_size)
-    log(10, "Neural network test success!")
-
-    local frame_files, frame_films = build_frame_set(train_frame_dir, max_frames_per_directory)
-    log(5, "Number of frames: " ..  #frame_files)
-
-    local load_data_thread_pool = threads.Threads(1, function(thread_id) end)
-
-    for epoch_index = 1, epochs do
-        log(3, "\nStarting epoch " .. epoch_index)
-
-        local load_data_mutex = threads.Mutex()
-        local train_data_mutex = threads.Mutex()
-        local load_data_mutex_id = load_data_mutex:id()
-        local train_data_mutex_id = train_data_mutex:id()
-        log(1, "Main thread: waiting for load mutex")
-        load_data_mutex:lock()
-        log(1, "Main thread: locked load mutex (initial lock)")
-
-        load_images_async(frame_files, frame_films, load_data_mutex_id, train_data_mutex_id, load_data_thread_pool)
-        local train_err = train_epoch(load_data_mutex, train_data_mutex, epoch_index)
-
-        load_data_thread_pool:synchronize()
-        load_data_mutex:free()
-        train_data_mutex:free()
-
-        --local test_err = test_data()
-        logger:add{train_err}
-        logger:plot()
-    end
-
-    load_data_thread_pool:terminate()
-    return neural_network
-end
-
-function test_data()
+function test_data(params, test_frame_dir)
     log(3, "\n\nTesting data with files from " .. test_frame_dir)
-    local films = load_films(test_frame_dir, max_frames_per_directory)
+    local films = load_films(test_frame_dir, params.max_frames_per_directory)
     log(3, "Number of test films: " ..  #films)
 
     local sum_mean_error = 0
@@ -211,8 +170,10 @@ function test_data()
         local predictions = {}
         for frame_index, frame_dir in pairs(film.frames) do
             local frame = image.load(frame_dir, 3, 'double')
+            local minibatch = torch.DoubleTensor(1, frame:size(1), frame:size(2), frame:size(3))
+            minibatch[1] = frame
             log(1, "feeding frame " .. frame_dir .. " to test network")
-            local prediction = neural_network:forward(frame)
+            local prediction = neural_network:forward(minibatch)
             log(1, "prediction: " .. prediction[1])
             sum_prediction = sum_prediction + prediction[1]
             local err = math.abs((prediction[1] - film.normalized_date)[1])
@@ -250,7 +211,7 @@ function test_data()
 end
 
 -- start a second thread each epoch that loads the image data for the current minibatch while it is being trained on
-function load_images_async(frame_files, frame_films, load_data_mutex_id, train_data_mutex_id, thread_pool) 
+function load_images_async(params, frame_files, frame_films, load_data_mutex_id, train_data_mutex_id, thread_pool) 
 
     -- load the frist frame in the list to get the size of the tensor we need to create
     local example_frame = image.load(frame_files[1], 3, 'double')
@@ -265,7 +226,7 @@ function load_images_async(frame_files, frame_films, load_data_mutex_id, train_d
             local image = require 'image'
             require 'helpers'
 
-            set_log_level(7)
+            set_log_level(9)
 
             log(3, "Load thread started")
 
@@ -276,7 +237,7 @@ function load_images_async(frame_files, frame_films, load_data_mutex_id, train_d
 
             -- calculate metrics
             local number_of_frames = count_frames(frame_files)
-            local number_of_minibatches = math.floor(number_of_frames / minibatch_size)
+            local number_of_minibatches = math.floor(number_of_frames / params.minibatch_size)
 
             -- shuffle the inputs according to a random permutation
             local randomized_indexes = torch.randperm(number_of_frames):long()
@@ -289,15 +250,15 @@ function load_images_async(frame_files, frame_films, load_data_mutex_id, train_d
             log(1, "Load thread: shuffled inputs")
 
             -- create empty tensors for current minibatch
-            local minibatch_frames = torch.DoubleTensor(minibatch_size, example_frame:size(1), example_frame:size(2), example_frame:size(3))
-            local minibatch_dates = torch.DoubleTensor(minibatch_size)
+            local minibatch_frames = torch.DoubleTensor(params.minibatch_size, example_frame:size(1), example_frame:size(2), example_frame:size(3))
+            local minibatch_dates = torch.DoubleTensor(params.minibatch_size)
 
             -- iterate over current epoch
             for minibatch_index = 1, number_of_minibatches do
                 log(3, "Load thread: starting loading for minibatch " .. minibatch_index)
 
                 -- iterate over input data and fill minibatch tensor
-                for intra_minibatch_index = 1, minibatch_size do
+                for intra_minibatch_index = 1, params.minibatch_size do
                     local abs_index = minibatch_index + intra_minibatch_index - 1
                     log(1, "trying to load image to memory: " .. shuffled_frame_files[abs_index])
                     local frame = image.load(shuffled_frame_files[abs_index], 3, 'double')
@@ -330,7 +291,3 @@ function load_images_async(frame_files, frame_films, load_data_mutex_id, train_d
     )
 end
 
--- start training the network
-train_data()
-set_log_level(5)
-test_data()
