@@ -78,7 +78,6 @@ function build_frame_set(frame_dir, max_frames_per_directory)
             end
         end
     end
-    print("")
     return frame_files, frame_films
 end
 
