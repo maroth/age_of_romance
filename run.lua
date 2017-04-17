@@ -2,10 +2,6 @@ require 'age_of_romance'
 require 'nn'
 pcall(require, "cunn")
 
-
--- start training the network
-
--- CONFIGURATION
 train_frame_dir = "/mnt/e/age_of_romance/mini_frames_test/"
 test_frame_dir = "/mnt/e/age_of_romance/mini_frames_test/"
 
@@ -20,9 +16,9 @@ if arg[2] ~= nil then
 end
 
 local params = {
-    use_cuda = false,
+    use_cuda = true,
     log_level = 8,
-    minibatch_size = 10,
+    minibatch_size = 2,
     epochs = 1000,
     max_frames_per_directory = nil,
     learningRate = 0.001,

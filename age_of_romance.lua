@@ -98,6 +98,11 @@ function train_epoch(neural_network, criterion, params, load_data_mutex, train_d
         local minibatch = cross_thread_minibatch_frames[1]
         local minibatch_dates = cross_thread_minibatch_dates[1]
 
+        if (params.use_cuda) then
+            minibatch = minibatch:cuda()
+            minibatch_dates = minibatch_dates:cuda()
+        end
+
         -- unlock the train mutex so the loading thread can start loading the next minibatch
         train_data_mutex:unlock()
         log(1, "Main thread: unlocked train mutex")
@@ -280,9 +285,12 @@ function load_images_async(params, frame_files, frame_films, load_data_mutex_id,
                 train_data_mutex:lock()
                 log(1, "Load thread: locked train mutex")
 
+                local minibatch = torch.DoubleTensor(minibatch_frames:size()):copy(minibatch_frames)
+                local minibatch_dates = torch.DoubleTensor(minibatch_dates:size()):copy(minibatch_dates)
+
                 -- write current minibatch to cross-thread sharing variables
-                cross_thread_minibatch_frames[1] = torch.DoubleTensor(minibatch_frames:size()):copy(minibatch_frames)
-                cross_thread_minibatch_dates[1] = torch.DoubleTensor(minibatch_dates:size()):copy(minibatch_dates)
+                cross_thread_minibatch_frames[1] = minibatch
+                cross_thread_minibatch_dates[1] = minibatch_dates
 
                 -- unlock data mutex so train thread can start working on this minibatch
                 load_data_mutex:unlock()
