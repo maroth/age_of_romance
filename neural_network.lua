@@ -31,10 +31,11 @@ function vgg_micro()
     vgg:add(nn.SpatialAveragePooling(6, 3, 6, 3))
     vgg:add(nn.SpatialConvolution(32, 64, 3, 3, 1, 1, 1, 1))
     vgg:add(nn.ReLU(true))
+    vgg:add(nn.SpatialAveragePooling(2, 2, 2, 2))
 
     vgg:add(nn.View(64))
-    vgg:add(nn.Linear(64, 6))
-    vgg:add(nn.Linear(6, 1))
+    vgg:add(nn.Linear(64, 16))
+    vgg:add(nn.Linear(16, 1))
 
     local criterion = nn.MSECriterion();
 

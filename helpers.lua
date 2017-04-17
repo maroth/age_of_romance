@@ -55,10 +55,9 @@ end
 function epoch_summary(epoch_index, epochs, err_sum, minibatch_size, starting_time)
     local fraction_done = epoch_index / epochs
     local estimated_remaining_time = get_remaining_time(starting_time, fraction_done)
-    local message = "\nEPOCH " .. epoch_index .. " OF " .. epochs .. " COMPLETED"
-    message = message .. "\nError rate: " .. err_sum / minibatch_size
-    message = message .. "\nRemaining time: " .. estimated_remaining_time
-    message = message .. "\n"
+    local message = "\n[" .. epoch_index .. "/" .. epochs .. "] "
+    message = message .. "Error rate: " .. err_sum / minibatch_size
+    message = message .. "\tRemaining time: " .. estimated_remaining_time
     return message
 end
 
