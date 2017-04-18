@@ -4,6 +4,7 @@ local status, lfs = pcall(require, "cunn")
 function sanity_check(test_network, test_criterion, frame_size, params)
     local value = torch.DoubleTensor(20, frame_size[1], frame_size[2], frame_size[3])
     local target = torch.DoubleTensor(20, 1)
+
     if (params.use_cuda) then
         value = value:cuda()
         target = target:cuda()

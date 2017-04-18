@@ -65,9 +65,10 @@ function train_minibatch(neural_network, criterion, params, minibatch)
 
         -- forward the minibatch through the network, getting the prediction
         local prediction = neural_network:forward(minibatch.frames)
-        log(2, "Fed minibatch " .. minibatch.index .. " into network")
+        log(2, "Fed minibatch " .. minibatch.index .. " into network, prediction is " .. prediction[1][1])
 
         -- forward the prediction through the criterion to the the error
+        print(minibatch.dates)
         local err = criterion:forward(prediction, minibatch.dates)
         log(2, "Forwarded prediction for minibatch " .. minibatch.index .. " into criterion, error is " .. err)
 

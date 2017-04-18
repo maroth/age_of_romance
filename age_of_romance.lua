@@ -44,29 +44,27 @@ function train_data(neural_network, criterion, params, train_frame_dir)
 
     -- create cross-thread exchange tensors
     local cross_thread_minibatch_frames = {}
-    cross_thread_minibatch_frames[1] = torch.DoubleTensor(params.minibatch_size, frame_size[1], frame_size[2], frame_size[3])
+    current_minibatch_frames[1] = torch.DoubleTensor(params.minibatch_size, frame_size[1], frame_size[2], frame_size[3])
     local cross_thread_minibatch_dates = {}
-    cross_thread_minibatch_dates[1] = torch.DoubleTensor(params.minibatch_size)
+    current_minibatch_dates[1] = torch.DoubleTensor(params.minibatch_size)
+
+    local cross_thread_minibatch_frames = {}
+    next_minibatch_frames[1] = torch.DoubleTensor(params.minibatch_size, frame_size[1], frame_size[2], frame_size[3])
+    local cross_thread_minibatch_dates = {}
+    next_minibatch_dates[1] = torch.DoubleTensor(params.minibatch_size)
 
     local starting_time = os.time()
+    load_images_async(params, frame_files, frame_films, load_data_thread_pool, next_minibatch_frames, next_minibatch_dates)
     for epoch_index = 1, params.epochs do
         log(3, "\nStarting epoch " .. epoch_index)
 
-        local load_data_mutex = threads.Mutex()
-        local train_data_mutex = threads.Mutex()
-        local load_data_mutex_id = load_data_mutex:id()
-        local train_data_mutex_id = train_data_mutex:id()
-
-        log(1, "Main thread: waiting for load mutex")
-        load_data_mutex:lock()
-        log(1, "Main thread: locked load mutex (initial lock)")
-
-        load_images_async(params, frame_files, frame_films, load_data_mutex_id, train_data_mutex_id, load_data_thread_pool, cross_thread_minibatch_frames, cross_thread_minibatch_dates)
-        local train_err = train_epoch(neural_network, criterion, params, load_data_mutex, train_data_mutex, epoch_index, cross_thread_minibatch_frames, cross_thread_minibatch_dates, starting_time)
+        load_images_async(params, frame_files, frame_films, load_data_thread_pool, next_minibatch_frames, next_minibatch_dates)
+        local train_err = train_epoch(neural_network, criterion, params, epoch_index, current_minibatch_frames, current_minibatch_dates, starting_time)
 
         load_data_thread_pool:synchronize()
-        load_data_mutex:free()
-        train_data_mutex:free()
+
+        current_minibatch_frames[1] = torch.DoubleTensor(next_minibatch_frames:size()):copy(next_minibatch_frames)
+        current_minibatch_dates[1] = torch.DoubleTensor(next_minibatch_dates:size()):copy(next_minibatch_dates)
     end
 
     load_data_thread_pool:terminate()
@@ -180,11 +178,6 @@ function load_images_async(params, frame_files, frame_films, load_data_mutex_id,
             set_log_level(1)
 
             log(3, "Load thread started")
-
-            -- Mutex objects are not shared between threads, so we reconstruct them with their IDs
-            local load_data_mutex = threads.Mutex(load_data_mutex_id)
-            local train_data_mutex = threads.Mutex(train_data_mutex_id)
-            log(1, "Load thread: created mutexes")
 
             -- calculate metrics
             local number_of_frames = count_frames(frame_files)

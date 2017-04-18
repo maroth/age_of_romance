@@ -9,13 +9,19 @@ end
 
 function toy()
     local toy = nn.Sequential()
-    toy:add(nn.SpatialConvolution(3, 3, 320, 189))
-    toy:add(nn.View(3))
-    toy:add(nn.Linear(3, 20))
-    toy:add(nn.Tanh())
-    toy:add(nn.Linear(20, 1))
+    toy:add(nn.View(3*189*320))
+    toy:add(nn.Sigmoid())
+    toy:add(nn.Linear(3*189*320, 128))
+    toy:add(nn.Sigmoid())
+    toy:add(nn.Linear(128, 32))
+    toy:add(nn.Sigmoid())
+    toy:add(nn.Linear(32, 4))
+    toy:add(nn.Sigmoid())
+    toy:add(nn.Linear(4, 1))
+    toy:add(nn.Sigmoid())
 
-    local criterion = nn.SmoothL1Criterion();
+
+    local criterion = nn.AbsCriterion()
 
     return toy, criterion
 end
