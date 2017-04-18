@@ -1,4 +1,5 @@
 require 'age_of_romance'
+require 'train_data'
 require 'neural_network'
 require 'nn'
 pcall(require, "cunn")
@@ -20,7 +21,7 @@ local params = {
     use_cuda = false,
     log_level = 1,
     minibatch_size = 1,
-    epochs = 1000,
+    epochs = 4,
     max_frames_per_directory = 1,
     learningRate = 0.001,
     learningRateDecay = 0,
@@ -39,5 +40,5 @@ if (params.use_cuda) then
     criterion = criterion:cuda()
 end
 
-train_data(neural_network, criterion, params, train_frame_dir)
-test_data(neural_network, criterion, params, test_frame_dir)
+train(neural_network, criterion, params, train_frame_dir)
+--test_data(neural_network, criterion, params, test_frame_dir)
