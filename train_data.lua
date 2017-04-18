@@ -34,8 +34,10 @@ function train_epoch(neural_network, criterion, params, frame_files, frame_films
     local current_minibatch, next_minibatch = create_minibatch_storage(params.minibatch_size, frame_size)
 
     if (params.use_cuda) then
-        current_minibatch = current_minibatch:cuda()
-        next_minibatch = next_minibatch:cuda()
+        current_minibatch.frames = current_minibatch.frames:cuda()
+        next_minibatch.frames = next_minibatch.frames:cuda()
+        current_minibatch.dates = current_minibatch.dates:cuda()
+        next_minibatch.dates = next_minibatch.dates:cuda()
     end
 
     load_minibatch(params, frame_size, current_minibatch, shuffled_data)
