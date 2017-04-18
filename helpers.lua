@@ -87,3 +87,20 @@ function median(list)
         return temp[math.ceil(#temp / 2)]
     end
 end
+
+function load_minibatch(params, frame_size, minibatch, shuffled_data)
+    log(3, "Load thread: starting loading for minibatch " .. minibatch.index)
+
+    for intra_minibatch_index = 1, params.minibatch_size do
+        local abs_index = minibatch.index + intra_minibatch_index - 1
+        log(1, "trying to load image to memory: " .. shuffled_data.files[abs_index])
+        local frame = image.load(shuffled_data.files[abs_index], 3, 'double')
+        local film = shuffled_data.films[abs_index]
+        minibatch.frames[intra_minibatch_index] = frame
+        minibatch.dates[intra_minibatch_index] = film.normalized_date
+        log(1, "loaded frame with normalized date " .. film.normalized_date[1])
+    end
+
+    log(3, "Load thread: loading complete for minibatch " .. minibatch.index)
+end
+
