@@ -25,11 +25,11 @@ function train(neural_network, criterion, params, train_frame_dir)
     local pool = threads.Threads(1, function(thread_id) end)
     local starting_time = os.time()
     for epoch_index = 1, params.epochs do
-        train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time)
+        train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time, epoch_index)
     end
 end
 
-function train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time)
+function train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time, epoch_index)
     local shuffled_data = shuffle_data(frame_files, frame_films)
     local current_minibatch, next_minibatch = create_minibatch_storage(params.minibatch_size, frame_size)
 
@@ -51,15 +51,16 @@ function train_epoch(neural_network, criterion, params, frame_files, frame_films
             set_log_level(1)
             load_minibatch(params, frame_size, next_minibatch, shuffled_data)
         end)
-        err_sum = err_sum + train_minibatch(neural_network, criterion, params, current_minibatch, frame_size)
+
+        err_sum = err_sum + train_minibatch(neural_network, criterion, params, current_minibatch, frame_size, epoch_index, number_of_minibatches, starting_time)
         pool:synchronize()
         swap_current_and_next(current_minibatch, next_minibatch)
     end
 
-    err_sum = err_sum + train_minibatch(neural_network, criterion, params, current_minibatch, frame_size)
+    err_sum = err_sum + train_minibatch(neural_network, criterion, params, current_minibatch, epoch_index, number_of_minibatches, starting_time)
 end
 
-function train_minibatch(neural_network, criterion, params, minibatch)
+function train_minibatch(neural_network, criterion, params, minibatch, epoch_index, number_of_minibatches, starting_time)
     local weights, weight_gradients = neural_network:getParameters()
 
     function feval(new_weights)
@@ -76,7 +77,6 @@ function train_minibatch(neural_network, criterion, params, minibatch)
         log(2, "Fed minibatch " .. minibatch.index .. " into network, prediction is " .. prediction[1][1])
 
         -- forward the prediction through the criterion to the the error
-        print(minibatch.dates)
         local err = criterion:forward(prediction, minibatch.dates)
         log(2, "Forwarded prediction for minibatch " .. minibatch.index .. " into criterion, error is " .. err)
 
@@ -88,8 +88,8 @@ function train_minibatch(neural_network, criterion, params, minibatch)
         -- feed the gradients backward through the network
         neural_network:backward(minibatch.frames, grad_criterion)
 
-        --log(7, minibatch_summary(minibatch.index, number_of_minibatches, epoch_index, params.epochs, starting_time, err_sum))
-        --log(5, minibatch_detail(params.minibatch_size, prediction, minibatch_dates, err[1]))
+        log(7, minibatch_summary(minibatch.index, number_of_minibatches, epoch_index, params.epochs, starting_time, err))
+        log(5, minibatch_detail(params.minibatch_size, prediction, minibatch.dates, err))
         
         return err, weight_gradients
     end
@@ -127,8 +127,8 @@ end
 function swap_current_and_next(current_minibatch, next_minibatch)
     current_minibatch.frames = torch.DoubleTensor(next_minibatch.frames:size()):copy(next_minibatch.frames)
     current_minibatch.dates = torch.DoubleTensor(next_minibatch.dates:size()):copy(next_minibatch.dates)
-    current_minibatch.index = next_minibatch.index 
 
+    current_minibatch.index = next_minibatch.index 
     next_minibatch.index = next_minibatch.index + 1
 end
 

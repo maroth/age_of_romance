@@ -19,7 +19,7 @@ end
 
 local params = {
     use_cuda = false,
-    log_level = 1,
+    log_level = 5,
     minibatch_size = 4,
     epochs = 4,
     max_frames_per_directory = 1,
@@ -32,9 +32,6 @@ local params = {
 }
 
 local neural_network = toy()
-print("neural network:")
-print(neural_network)
-
 local criterion = nn.MSECriterion();
 
 if (params.use_cuda) then

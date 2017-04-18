@@ -6,7 +6,7 @@ require 'load_logic'
 require 'helpers'
 
 function test(neural_network, criterion, params, test_frame_dir) 
-    set_log_level(1)
+    set_log_level(params.log_level)
     log(3, "\n\nTesting data with files from " .. test_frame_dir)
     local films = load_films(test_frame_dir, params.max_frames_per_directory)
     log(3, "Number of test films: " ..  #films)
