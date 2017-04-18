@@ -1,9 +1,10 @@
 require 'age_of_romance'
+require 'neural_network'
 require 'nn'
 pcall(require, "cunn")
 
-train_frame_dir = "/mnt/e/age_of_romance/mini_frames_test/"
-test_frame_dir = "/mnt/e/age_of_romance/mini_frames_test/"
+train_frame_dir = "/mnt/e/age_of_romance/micro_frames_test/"
+test_frame_dir = "/mnt/e/age_of_romance/micro_frames_test/"
 
 -- command line argument 1 overrides training frame directory
 if arg[1] ~= nil then
@@ -16,11 +17,11 @@ if arg[2] ~= nil then
 end
 
 local params = {
-    use_cuda = true,
-    log_level = 8,
-    minibatch_size = 2,
+    use_cuda = false,
+    log_level = 1,
+    minibatch_size = 1,
     epochs = 1000,
-    max_frames_per_directory = nil,
+    max_frames_per_directory = 1,
     learningRate = 0.001,
     learningRateDecay = 0,
     weightDecay = 0,
@@ -29,21 +30,7 @@ local params = {
     momentum = 0,
 }
 
-local neural_network = nn.Sequential()
-neural_network:add(nn.SpatialAveragePooling(9, 10, 5, 6))
-neural_network:add(nn.SpatialConvolution(3, 16, 3, 3, 1, 1, 1, 1))
-neural_network:add(nn.ReLU(true))
-neural_network:add(nn.SpatialAveragePooling(3, 3, 3, 3))
-neural_network:add(nn.SpatialConvolution(16, 32, 3, 3, 1, 1, 1, 1))
-neural_network:add(nn.ReLU(true))
-neural_network:add(nn.SpatialAveragePooling(6, 3, 6, 3))
-neural_network:add(nn.SpatialConvolution(32, 64, 3, 3, 1, 1, 1, 1))
-neural_network:add(nn.ReLU(true))
-neural_network:add(nn.SpatialAveragePooling(2, 2, 2, 2))
-
-neural_network:add(nn.View(64))
-neural_network:add(nn.Linear(64, 16))
-neural_network:add(nn.Linear(16, 1))
+local neural_network = toy()
 
 local criterion = nn.MSECriterion();
 

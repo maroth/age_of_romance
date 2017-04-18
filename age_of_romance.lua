@@ -8,21 +8,13 @@ require 'load_logic'
 require 'helpers'
 require 'test_network'
 
-local status, lfs = pcall(require, "cunn")
-if(status) then
-    log(8, "CUNN loaded, CUDA available")
-end
+pcall(require, "cunn")
 
-local tds = require 'tds'
 local threads = require 'threads'
 threads.Threads.serialization('threads.sharedserialize')
 
-local sgd_state = {}
 
 -- initialize cross-thread variables for minibatch exchange
-local cross_thread_minibatch_frames = tds.Hash()
-local cross_thread_minibatch_dates = tds.Hash()
-
 -- logger for accuracy loggin
 local logger = optim.Logger('training_error.log')
 logger:setlogscale()
@@ -30,9 +22,10 @@ logger:setNames{'Training error'}
 logger:style{'+-'}
 
 -- remember starting time so we can estimate time till completion during training
-local starting_time = os.time()
 
 function train_data(neural_network, criterion, params, train_frame_dir) 
+    local sgd_state = {}
+
     local weights, weight_gradients = neural_network:getParameters()
     set_log_level(params.log_level)
     log(10, "Starting training on data in directory " .. train_frame_dir)
@@ -49,6 +42,13 @@ function train_data(neural_network, criterion, params, train_frame_dir)
 
     local load_data_thread_pool = threads.Threads(1, function(thread_id) end)
 
+    -- create cross-thread exchange tensors
+    local cross_thread_minibatch_frames = {}
+    cross_thread_minibatch_frames[1] = torch.DoubleTensor(params.minibatch_size, frame_size[1], frame_size[2], frame_size[3])
+    local cross_thread_minibatch_dates = {}
+    cross_thread_minibatch_dates[1] = torch.DoubleTensor(params.minibatch_size)
+
+    local starting_time = os.time()
     for epoch_index = 1, params.epochs do
         log(3, "\nStarting epoch " .. epoch_index)
 
@@ -56,17 +56,17 @@ function train_data(neural_network, criterion, params, train_frame_dir)
         local train_data_mutex = threads.Mutex()
         local load_data_mutex_id = load_data_mutex:id()
         local train_data_mutex_id = train_data_mutex:id()
+
         log(1, "Main thread: waiting for load mutex")
         load_data_mutex:lock()
         log(1, "Main thread: locked load mutex (initial lock)")
 
-        load_images_async(params, frame_files, frame_films, load_data_mutex_id, train_data_mutex_id, load_data_thread_pool)
-        local train_err = train_epoch(neural_network, criterion, params, load_data_mutex, train_data_mutex, epoch_index)
+        load_images_async(params, frame_files, frame_films, load_data_mutex_id, train_data_mutex_id, load_data_thread_pool, cross_thread_minibatch_frames, cross_thread_minibatch_dates)
+        local train_err = train_epoch(neural_network, criterion, params, load_data_mutex, train_data_mutex, epoch_index, cross_thread_minibatch_frames, cross_thread_minibatch_dates, starting_time)
 
         load_data_thread_pool:synchronize()
         load_data_mutex:free()
         train_data_mutex:free()
-
     end
 
     load_data_thread_pool:terminate()
@@ -75,7 +75,7 @@ end
 
 
 -- train a complete epoch, while asynchronously loading image data from the loading thread
-function train_epoch(neural_network, criterion, params, load_data_mutex, train_data_mutex, epoch_index) 
+function train_epoch(neural_network, criterion, params, load_data_mutex, train_data_mutex, epoch_index, cross_thread_minibatch_frames, cross_thread_minibatch_dates, starting_time) 
 
     local weights, weight_gradients = neural_network:getParameters()
     local number_of_frames = count_frames(frame_files)
@@ -95,17 +95,18 @@ function train_epoch(neural_network, criterion, params, load_data_mutex, train_d
         log(1, "Main thread: locked load mutex")
 
         -- load the next minibatch frames and true dates from the loading thread
-        local minibatch = cross_thread_minibatch_frames[1]
-        local minibatch_dates = cross_thread_minibatch_dates[1]
-
-        if (params.use_cuda) then
-            minibatch = minibatch:cuda()
-            minibatch_dates = minibatch_dates:cuda()
-        end
+        local minibatch_frames = torch.DoubleTensor(cross_thread_minibatch_frames[1]:size()):copy(cross_thread_minibatch_frames[1])
+        local minibatch_dates = torch.DoubleTensor(cross_thread_minibatch_dates[1]:size()):copy(cross_thread_minibatch_dates[1])
 
         -- unlock the train mutex so the loading thread can start loading the next minibatch
         train_data_mutex:unlock()
         log(1, "Main thread: unlocked train mutex")
+
+
+        if (params.use_cuda) then
+            minibatch_frames = minibatch:cuda()
+            minibatch_dates = minibatch_dates:cuda()
+        end
 
         collectgarbage()
         collectgarbage()
@@ -123,7 +124,8 @@ function train_epoch(neural_network, criterion, params, load_data_mutex, train_d
             weight_gradients:zero()
 
             -- forward the minibatch through the network, getting the prediction
-            prediction = neural_network:forward(minibatch)
+
+            prediction = neural_network:forward(minibatch_frames)
             log(2, "Fed minibatch " .. minibatch_index .. " into network")
 
             -- forward the prediction through the criterion to the the error
@@ -136,10 +138,11 @@ function train_epoch(neural_network, criterion, params, load_data_mutex, train_d
             log(2, "Backwarded prediction for minibatch " .. minibatch_index .. " into criterion, mean grad_criterion is " .. grad_criterion:mean())
 
             -- feed the gradients backward through the network
-            neural_network:backward(minibatch, grad_criterion)
+            neural_network:backward(minibatch_frames, grad_criterion)
             
             return err, weight_gradients
         end
+
 
         local new_weights, err = optim.sgd(feval, weights, params, sgd_state)
         
@@ -157,6 +160,87 @@ function train_epoch(neural_network, criterion, params, load_data_mutex, train_d
     return err_sum
 end
 
+
+-- start a second thread each epoch that loads the image data for the current minibatch while it is being trained on
+function load_images_async(params, frame_files, frame_films, load_data_mutex_id, train_data_mutex_id, thread_pool, cross_thread_minibatch_frames, cross_thread_minibatch_dates) 
+
+    -- load the frist frame in the list to get the size of the tensor we need to create
+    local example_frame = image.load(frame_files[1], 3, 'double')
+    log(1, "Load thread: example frame loaded with size " .. example_frame:size(1) .. " x " .. example_frame:size(2) .. " x " .. example_frame:size(3))
+
+    thread_pool:addjob(
+        function()
+
+            -- as this thread runs in a seperate context, we need to re-import the requirements
+            local threads = require 'threads'
+            local torch = require 'torch'
+            local image = require 'image'
+            require 'helpers'
+
+            set_log_level(1)
+
+            log(3, "Load thread started")
+
+            -- Mutex objects are not shared between threads, so we reconstruct them with their IDs
+            local load_data_mutex = threads.Mutex(load_data_mutex_id)
+            local train_data_mutex = threads.Mutex(train_data_mutex_id)
+            log(1, "Load thread: created mutexes")
+
+            -- calculate metrics
+            local number_of_frames = count_frames(frame_files)
+            local number_of_minibatches = math.floor(number_of_frames / params.minibatch_size)
+
+            -- shuffle the inputs according to a random permutation
+            local randomized_indexes = torch.randperm(number_of_frames):long()
+            local shuffled_frame_files = {}
+            local shuffled_frame_films = {}
+            for index = 1, number_of_frames do
+                shuffled_frame_files[index] = frame_files[randomized_indexes[index]]
+                shuffled_frame_films[index] = frame_films[randomized_indexes[index]]
+            end
+            log(1, "Load thread: shuffled inputs")
+
+            -- create empty tensors for current minibatch
+            local minibatch_frames = torch.DoubleTensor(params.minibatch_size, example_frame:size(1), example_frame:size(2), example_frame:size(3))
+            local minibatch_dates = torch.DoubleTensor(params.minibatch_size)
+
+            -- iterate over current epoch
+            for minibatch_index = 1, number_of_minibatches do
+                log(3, "Load thread: starting loading for minibatch " .. minibatch_index)
+
+                -- iterate over input data and fill minibatch tensor
+                for intra_minibatch_index = 1, params.minibatch_size do
+                    local abs_index = minibatch_index + intra_minibatch_index - 1
+                    log(1, "trying to load image to memory: " .. shuffled_frame_files[abs_index])
+                    local frame = image.load(shuffled_frame_files[abs_index], 3, 'double')
+                    local film = shuffled_frame_films[abs_index]
+                    minibatch_frames[intra_minibatch_index] = frame
+                    minibatch_dates[intra_minibatch_index] = film.normalized_date
+                    log(1, "loaded frame with normalized date " .. film.normalized_date[1])
+                end
+
+                log(3, "Load thread: loading complete for minibatch " .. minibatch_index)
+
+                -- lock train mutex so training thread can read read data until we are done writing it
+                log(1, "Load thread: waiting for train mutex")
+                train_data_mutex:lock()
+                log(1, "Load thread: locked train mutex")
+
+                -- write current minibatch to cross-thread sharing variables
+                cross_thread_minibatch_frames[1] = cross_thread_minibatch_frames[1]:copy(minibatch_frames)
+                cross_thread_minibatch_dates[1] = cross_thread_minibatch_dates[1]:copy(minibatch_dates)
+
+                -- unlock data mutex so train thread can start working on this minibatch
+                load_data_mutex:unlock()
+                log(1, "Load thread: unlocked load mutex")
+
+                -- garbage collection so our RAM usage stays low
+                collectgarbage()
+                collectgarbage()
+            end
+        end
+    )
+end
 
 function test_data(neural_network, criterion, params, test_frame_dir)
     log(3, "\n\nTesting data with files from " .. test_frame_dir)
@@ -218,89 +302,5 @@ function test_data(neural_network, criterion, params, test_frame_dir)
 
 
     return mean_error, median_error
-end
-
--- start a second thread each epoch that loads the image data for the current minibatch while it is being trained on
-function load_images_async(params, frame_files, frame_films, load_data_mutex_id, train_data_mutex_id, thread_pool) 
-
-    -- load the frist frame in the list to get the size of the tensor we need to create
-    local example_frame = image.load(frame_files[1], 3, 'double')
-    log(1, "Load thread: example frame loaded with size " .. example_frame:size(1) .. " x " .. example_frame:size(2) .. " x " .. example_frame:size(3))
-
-    thread_pool:addjob(
-        function()
-
-            -- as this thread runs in a seperate context, we need to re-import the requirements
-            local threads = require 'threads'
-            local torch = require 'torch'
-            local image = require 'image'
-            require 'helpers'
-
-            set_log_level(9)
-
-            log(3, "Load thread started")
-
-            -- Mutex objects are not shared between threads, so we reconstruct them with their IDs
-            local load_data_mutex = threads.Mutex(load_data_mutex_id)
-            local train_data_mutex = threads.Mutex(train_data_mutex_id)
-            log(1, "Load thread: created mutexes")
-
-            -- calculate metrics
-            local number_of_frames = count_frames(frame_files)
-            local number_of_minibatches = math.floor(number_of_frames / params.minibatch_size)
-
-            -- shuffle the inputs according to a random permutation
-            local randomized_indexes = torch.randperm(number_of_frames):long()
-            local shuffled_frame_files = {}
-            local shuffled_frame_films = {}
-            for index = 1, number_of_frames do
-                shuffled_frame_files[index] = frame_files[randomized_indexes[index]]
-                shuffled_frame_films[index] = frame_films[randomized_indexes[index]]
-            end
-            log(1, "Load thread: shuffled inputs")
-
-            -- create empty tensors for current minibatch
-            local minibatch_frames = torch.DoubleTensor(params.minibatch_size, example_frame:size(1), example_frame:size(2), example_frame:size(3))
-            local minibatch_dates = torch.DoubleTensor(params.minibatch_size)
-
-            -- iterate over current epoch
-            for minibatch_index = 1, number_of_minibatches do
-                log(3, "Load thread: starting loading for minibatch " .. minibatch_index)
-
-                -- iterate over input data and fill minibatch tensor
-                for intra_minibatch_index = 1, params.minibatch_size do
-                    local abs_index = minibatch_index + intra_minibatch_index - 1
-                    log(1, "trying to load image to memory: " .. shuffled_frame_files[abs_index])
-                    local frame = image.load(shuffled_frame_files[abs_index], 3, 'double')
-                    local film = shuffled_frame_films[abs_index]
-                    minibatch_frames[intra_minibatch_index] = frame
-                    minibatch_dates[intra_minibatch_index] = film.normalized_date
-                    log(1, "loaded frame with normalized date " .. film.normalized_date[1])
-                end
-
-                log(3, "Load thread: loading complete for minibatch " .. minibatch_index)
-
-                -- lock train mutex so training thread can read read data until we are done writing it
-                log(1, "Load thread: waiting for train mutex")
-                train_data_mutex:lock()
-                log(1, "Load thread: locked train mutex")
-
-                local minibatch = torch.DoubleTensor(minibatch_frames:size()):copy(minibatch_frames)
-                local minibatch_dates = torch.DoubleTensor(minibatch_dates:size()):copy(minibatch_dates)
-
-                -- write current minibatch to cross-thread sharing variables
-                cross_thread_minibatch_frames[1] = minibatch
-                cross_thread_minibatch_dates[1] = minibatch_dates
-
-                -- unlock data mutex so train thread can start working on this minibatch
-                load_data_mutex:unlock()
-                log(1, "Load thread: unlocked load mutex")
-
-                -- garbage collection so our RAM usage stays low
-                collectgarbage()
-                collectgarbage()
-            end
-        end
-    )
 end
 
