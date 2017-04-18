@@ -9,19 +9,13 @@ end
 
 function toy()
     local toy = nn.Sequential()
-    toy:add(nn.View(3*189*320))
-    toy:add(nn.Sigmoid())
-    toy:add(nn.Linear(3*189*320, 128))
-    toy:add(nn.Sigmoid())
-    toy:add(nn.Linear(128, 32))
-    toy:add(nn.Sigmoid())
-    toy:add(nn.Linear(32, 4))
-    toy:add(nn.Sigmoid())
-    toy:add(nn.Linear(4, 1))
-    toy:add(nn.Sigmoid())
+    toy:add(nn.SpatialMaxPooling(1, 1, 1000, 1000))
+    toy:add(nn.View(3))
+    toy:add(nn.Linear(3, 32))
+    toy:add(nn.ReLU())
+    toy:add(nn.Linear(32, 1))
 
-
-    local criterion = nn.AbsCriterion()
+    local criterion = nn.MSECriterion()
 
     return toy, criterion
 end

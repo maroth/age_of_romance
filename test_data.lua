@@ -33,7 +33,12 @@ function test(neural_network, criterion, params, test_frame_dir)
             minibatch[1] = frame
             log(1, "feeding frame " .. frame_dir .. " to test network")
             local prediction = neural_network:forward(minibatch)
-            log(1, "prediction: " .. prediction[1])
+            if (prediction:size(1) > 1) then
+                local_prediction = prediction[1][1]
+            else
+                local_prediction = prediction[1]
+            end
+            log(2, "Fed frame " .. frame_index .. " into network, prediction is " .. local_prediction)
             sum_prediction = sum_prediction + prediction[1]
             local err = math.abs((prediction[1] - film.normalized_date)[1])
             frame_count = frame_count + 1

@@ -14,6 +14,11 @@ threads.Threads.serialization('threads.sharedserialize')
 function train(neural_network, criterion, params, train_frame_dir) 
     set_log_level(params.log_level)
 
+    if (params.load_saved_model) then
+        log(10, "loading model from " .. params.model_filename)
+        neural_network = torch.load(params.model_filename)
+    end
+
     local frame_size = get_frame_size(train_frame_dir)
     local frame_files, frame_films = build_frame_set(train_frame_dir, params.max_frames_per_directory)
     sanity_check(neural_network, criterion, frame_size, params)
@@ -35,6 +40,8 @@ function train(neural_network, criterion, params, train_frame_dir)
     end
 
     logger:plot()
+
+    return neural_network
 end
 
 function train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time, epoch_index, logger)
@@ -56,21 +63,25 @@ function train_epoch(neural_network, criterion, params, frame_files, frame_films
         pool:addjob(function()
             local image = require 'image'
             require 'helpers'
-            set_log_level(1)
+            set_log_level(params.log_level)
             load_minibatch(params, frame_size, next_minibatch, shuffled_data)
         end)
 
-        err_sum = err_sum + train_minibatch(neural_network, criterion, params, current_minibatch, frame_size, epoch_index, number_of_minibatches, starting_time)
-        logger:add{err_sum}
+        err_sum = err_sum + train_minibatch(neural_network, criterion, params, current_minibatch, epoch_index, number_of_minibatches, starting_time)
         pool:synchronize()
         swap_current_and_next(current_minibatch, next_minibatch)
     end
 
     err_sum = err_sum + train_minibatch(neural_network, criterion, params, current_minibatch, epoch_index, number_of_minibatches, starting_time)
+
+    log(9, epoch_summary(epoch_index, params.epochs, err_sum, params.minibatch_size, starting_time))
+
     logger:add{err_sum}
     if (params.display_plot) then
         logger:plot()
     end
+
+    torch.save(params.model_filename, neural_network)
 end
 
 function train_minibatch(neural_network, criterion, params, minibatch, epoch_index, number_of_minibatches, starting_time)
@@ -87,7 +98,12 @@ function train_minibatch(neural_network, criterion, params, minibatch, epoch_ind
 
         -- forward the minibatch through the network, getting the prediction
         local prediction = neural_network:forward(minibatch.frames)
-        log(2, "Fed minibatch " .. minibatch.index .. " into network, prediction is " .. prediction[1][1])
+        if (prediction:size(1) > 1) then
+            local_prediction = prediction[1][1]
+        else
+            local_prediction = prediction[1]
+        end
+        log(2, "Fed minibatch " .. minibatch.index .. " into network, prediction is " .. local_prediction)
 
         -- forward the prediction through the criterion to the the error
         local err = criterion:forward(prediction, minibatch.dates)

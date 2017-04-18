@@ -47,7 +47,7 @@ function minibatch_detail(minibatch_size, prediction, minibatch_dates, err)
         message = message .. "\nprediction: " .. string.format("%.3f", local_prediction)
         message = message .. " \ttruth: " .. string.format("%.3f", minibatch_dates[i])
         message = message .. " \tdiff: " ..  string.format("%.3f", math.abs(local_prediction - minibatch_dates[i]))
-        message = message .. " \terror: " .. string.format("%.3f", err)
+        message = message .. " \ttotal error: " .. string.format("%.3f", err)
     end
     return message
 end

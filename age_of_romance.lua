@@ -152,7 +152,9 @@ function train_epoch(neural_network, criterion, params, load_data_mutex, train_d
     end
 
     logger:add{err_sum}
-    --logger:plot()
+    if (params.display_log) then
+        logger:plot()
+    end
 
     log(10, epoch_summary(epoch_index, params.epochs, err_sum, params.minibatch_size, starting_time))
     return err_sum
