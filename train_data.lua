@@ -32,6 +32,12 @@ end
 function train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time)
     local shuffled_data = shuffle_data(frame_files, frame_films)
     local current_minibatch, next_minibatch = create_minibatch_storage(params.minibatch_size, frame_size)
+
+    if (params.use_cuda) then
+        current_minibatch = current_minibatch:cuda()
+        next_minibatch = next_minibatch:cuda()
+    end
+
     load_minibatch(params, frame_size, current_minibatch, shuffled_data)
 
     local err_sum = 0
