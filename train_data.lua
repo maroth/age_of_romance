@@ -22,14 +22,22 @@ function train(neural_network, criterion, params, train_frame_dir)
     log(7, "Frame size: " ..  frame_size[1] .. " x " .. frame_size[2] .. " x " .. frame_size[3])
     log(10, "Number of frames: " ..  #frame_files)
 
+    local logger = optim.Logger('training_error.log')
+    logger:setlogscale()
+    logger:setNames{'Training error'}
+    logger:style{'+-'}
+    logger:display(params.display_plot)
+
     local pool = threads.Threads(1, function(thread_id) end)
     local starting_time = os.time()
     for epoch_index = 1, params.epochs do
-        train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time, epoch_index)
+        train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time, epoch_index, logger)
     end
+
+    logger:plot()
 end
 
-function train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time, epoch_index)
+function train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time, epoch_index, logger)
     local shuffled_data = shuffle_data(frame_files, frame_films)
     local current_minibatch, next_minibatch = create_minibatch_storage(params.minibatch_size, frame_size)
 
@@ -53,11 +61,16 @@ function train_epoch(neural_network, criterion, params, frame_files, frame_films
         end)
 
         err_sum = err_sum + train_minibatch(neural_network, criterion, params, current_minibatch, frame_size, epoch_index, number_of_minibatches, starting_time)
+        logger:add{err_sum}
         pool:synchronize()
         swap_current_and_next(current_minibatch, next_minibatch)
     end
 
     err_sum = err_sum + train_minibatch(neural_network, criterion, params, current_minibatch, epoch_index, number_of_minibatches, starting_time)
+    logger:add{err_sum}
+    if (params.display_plot) then
+        logger:plot()
+    end
 end
 
 function train_minibatch(neural_network, criterion, params, minibatch, epoch_index, number_of_minibatches, starting_time)
@@ -97,7 +110,6 @@ function train_minibatch(neural_network, criterion, params, minibatch, epoch_ind
 
     local new_weights, err = optim.sgd(feval, weights, params)
     
-    -- accumulate error for logging purposes
     return err[1]
 end
 

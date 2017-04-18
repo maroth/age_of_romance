@@ -19,6 +19,7 @@ end
 
 local params = {
     use_cuda = false,
+    display_plot = true,
     log_level = 5,
     minibatch_size = 4,
     epochs = 4,

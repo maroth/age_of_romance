@@ -17,6 +17,7 @@ function test(neural_network, criterion, params, test_frame_dir)
     local film_logger = optim.Logger('results.log')
     film_logger:setNames{'Truth', 'Mean Prediction', 'Median Prediction'}
     film_logger:style{'+-', '+-', '+-', '+-'}
+    film_logger:display(params.display_plot)
 
     for _, film in pairs(films) do
         local sum_prediction = 0
@@ -56,7 +57,10 @@ function test(neural_network, criterion, params, test_frame_dir)
         log(8, "")
         log(8, film.title)
         log(8, "actual date: " .. film.date ..  "\tmean prediction: " .. denormalized_mean .. "\tmedian prediction: " .. denormalized_median)
-        --film_logger:plot()
+
+        if (params.display_plot) then
+            film_logger:plot()
+        end
     end
 
     local mean_error = sum_mean_error / #films
@@ -64,7 +68,7 @@ function test(neural_network, criterion, params, test_frame_dir)
     log(8, "mean of mean error on test set: " .. mean_error)
     log(8, "mean of median error on test set: " .. median_error)
 
-
+    film_logger:plot()
     return mean_error, median_error
 end
 
