@@ -27,7 +27,7 @@ function parse_info_file(info_file_path)
     return film_info
 end
 
-function load_films(frame_dir, max_frames_per_directory)
+function load_films(frame_dir, max_frames_per_directory, number_of_bins)
     films = {}
     for film_dir in lfs.dir(frame_dir) do    
         local info_file_path = frame_dir .. "/" .. film_dir .. "/info.json"
@@ -35,6 +35,8 @@ function load_films(frame_dir, max_frames_per_directory)
             local film  = parse_info_file(info_file_path)
             local frames_count = 0
             film.normalized_date = normalize_date(parse_date(film.date))
+            film.bin_vector = create_probability_vector(film.normalized_date[1], number_of_bins)
+            film.bin = get_bin(film.normalized_date[1], number_of_bins)
             film.frames = {}
             for frame_file in lfs.dir(frame_dir .. "/" .. film_dir) do
                 if max_frames_per_directory == nil or max_frames_per_directory > frames_count then
@@ -53,7 +55,7 @@ function load_films(frame_dir, max_frames_per_directory)
     return films
 end
 
-function build_frame_set(frame_dir, max_frames_per_directory)
+function build_frame_set(frame_dir, max_frames_per_directory, number_of_bins)
     local index = 0
     frame_files = {}
     frame_films = {}
@@ -62,6 +64,8 @@ function build_frame_set(frame_dir, max_frames_per_directory)
         if file_exists(info_file_path) then
             local film  = parse_info_file(info_file_path)
             film.normalized_date = normalize_date(parse_date(film.date))
+            film.bin_vector = create_probability_vector(film.normalized_date[1], number_of_bins)
+            film.bin = get_bin(film.normalized_date[1], number_of_bins)
             local frames_count = 0
             for frame_file in lfs.dir(frame_dir .. "/" .. film_dir) do
                 if max_frames_per_directory == nil or max_frames_per_directory > frames_count then

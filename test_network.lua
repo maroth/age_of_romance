@@ -2,12 +2,17 @@ require 'nn'
 local status, lfs = pcall(require, "cunn")
 
 function sanity_check(test_network, test_criterion, frame_size, params)
-    local value = torch.DoubleTensor(20, frame_size[1], frame_size[2], frame_size[3])
-    local target = torch.DoubleTensor(20, 1)
+
+    local value = torch.DoubleTensor(params.minibatch_size, frame_size[1], frame_size[2], frame_size[3])
+    local target = torch.LongTensor(params.minibatch_size)
+
+    for index = 1, params.minibatch_size do
+        target[index] = math.random(1, params.number_of_bins)
+    end
 
     if (params.use_cuda) then
         value = value:cuda()
-        target = target:cuda()
+        -- target = target:cuda()
     end
     
     local test_prediction = test_network:forward(value)

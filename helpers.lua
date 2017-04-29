@@ -56,10 +56,10 @@ end
 function epoch_summary(epoch_index, epochs, err_sum, minibatch_size, starting_time)
     local fraction_done = epoch_index / epochs
     local estimated_remaining_time = get_remaining_time(starting_time, fraction_done)
-    local message = "\n[" .. epoch_index .. "/" .. epochs .. "] "
+    local message = "[" .. epoch_index .. "/" .. epochs .. "] "
     message = message .. "Error rate: " .. err_sum / minibatch_size
     message = message .. "\tRemaining time: " .. estimated_remaining_time
-    return message
+    return message .. "\n"
 end
 
 
@@ -99,6 +99,8 @@ function load_minibatch(params, frame_size, minibatch, shuffled_data)
         local film = shuffled_data.films[abs_index]
         minibatch.frames[intra_minibatch_index] = frame
         minibatch.dates[intra_minibatch_index] = film.normalized_date
+        minibatch.bins[intra_minibatch_index] = film.bin
+        minibatch.probability_vectors[intra_minibatch_index] = film.bin_vector
         log(1, "loaded frame with normalized date " .. film.normalized_date[1])
     end
 
