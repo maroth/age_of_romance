@@ -50,9 +50,7 @@ function train_epoch(neural_network, criterion, params, frame_files, frame_films
 
     if (params.use_cuda) then
         current_minibatch.frames = current_minibatch.frames:cuda()
-        next_minibatch.frames = next_minibatch.frames:cuda()
         current_minibatch.dates = current_minibatch.dates:cuda()
-        next_minibatch.dates = next_minibatch.dates:cuda()
     end
 
     load_minibatch(params, frame_size, current_minibatch, shuffled_data)
@@ -60,6 +58,7 @@ function train_epoch(neural_network, criterion, params, frame_files, frame_films
     local err_sum = 0
     local number_of_minibatches = get_number_of_minibatches(#frame_files, params.minibatch_size)
     for minibatch_index = 1, number_of_minibatches - 1 do
+
         pool:addjob(function()
             local image = require 'image'
             require 'helpers'
@@ -67,9 +66,21 @@ function train_epoch(neural_network, criterion, params, frame_files, frame_films
             load_minibatch(params, frame_size, next_minibatch, shuffled_data)
         end)
 
-        err_sum = err_sum + train_minibatch(neural_network, criterion, params, current_minibatch, epoch_index, number_of_minibatches, starting_time)
+        err = train_minibatch(neural_network, criterion, params, current_minibatch, epoch_index, number_of_minibatches, starting_time)
+        err_sum = err_sum + err
+
         pool:synchronize()
-        swap_current_and_next(current_minibatch, next_minibatch)
+
+        if (params.use_cuda) then
+            current_minibatch.frames = torch.CudaTensor(next_minibatch.frames:size()):copy(next_minibatch.frames:cuda())
+            current_minibatch.dates = torch.CudaTensor(next_minibatch.dates:size()):copy(next_minibatch.dates:cuda())
+        else
+            current_minibatch.frames = torch.DoubleTensor(next_minibatch.frames:size()):copy(next_minibatch.frames)
+            current_minibatch.dates = torch.DoubleTensor(next_minibatch.dates:size()):copy(next_minibatch.dates)
+        end
+
+        current_minibatch.index = next_minibatch.index 
+        next_minibatch.index = next_minibatch.index + 1
     end
 
     err_sum = err_sum + train_minibatch(neural_network, criterion, params, current_minibatch, epoch_index, number_of_minibatches, starting_time)
@@ -153,11 +164,6 @@ function shuffle_data(frame_files, frame_films)
 end
 
 function swap_current_and_next(current_minibatch, next_minibatch)
-    current_minibatch.frames = torch.DoubleTensor(next_minibatch.frames:size()):copy(next_minibatch.frames)
-    current_minibatch.dates = torch.DoubleTensor(next_minibatch.dates:size()):copy(next_minibatch.dates)
-
-    current_minibatch.index = next_minibatch.index 
-    next_minibatch.index = next_minibatch.index + 1
 end
 
 function create_minibatch_storage(minibatch_size, frame_size)

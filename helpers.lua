@@ -1,3 +1,5 @@
+require 'cunn'
+
 function string.ends(String,End)
    return End=='' or string.sub(String,-string.len(End))==End
 end
@@ -27,10 +29,9 @@ function get_remaining_time(starting_time, fraction_done)
     return formatted_time
 end
 
-function minibatch_summary(minibatch_index, number_of_minibatches, epoch_index, epochs, starting_time, err_sum)
+function minibatch_summary(minibatch_index, number_of_minibatches, epoch_index, epochs, starting_time, err)
     local fraction_done  = ((epoch_index - 1) * number_of_minibatches + (minibatch_index - 1)) / (epochs * number_of_minibatches)
     local estimated_remaining_time = get_remaining_time(starting_time, fraction_done)
-    local err = err_sum / minibatch_index * 1000
     message = ("[" .. epoch_index .. "/" .. epochs .. "] " .. " minibatch " .. minibatch_index .. " of " .. number_of_minibatches .. ", error rate: " .. string.format("%.5f", err) .. " (" .. string.format("%.3f", fraction_done * 100) .. "%, remaining time: " .. estimated_remaining_time .. ")")
     return message
 end

@@ -4,8 +4,8 @@ require 'neural_network'
 require 'nn'
 pcall(require, "cunn")
 
-train_frame_dir = "/mnt/e/age_of_romance/sanity_check/"
-test_frame_dir = "/mnt/e/age_of_romance/sanity_check/"
+train_frame_dir = "/media/markus/Data/age_of_romance/mini_frames_test/"
+test_frame_dir = "/media/markus/Data/age_of_romance/mini_frames_test/"
 
 -- command line argument 1 overrides training frame directory
 if arg[1] ~= nil then
@@ -18,11 +18,11 @@ if arg[2] ~= nil then
 end
 
 local params = {
-    use_cuda = false,
+    use_cuda = true,
     display_plot = true,
     model_filename = 'model.bin',
     load_saved_model = false,
-    log_level = 6,
+    log_level = 8,
     minibatch_size = 6,
     epochs = 120, 
     max_frames_per_directory = 1,
@@ -34,7 +34,7 @@ local params = {
     momentum = 0.01,
 }
 
-local neural_network = toy()
+local neural_network = vgg_micro()
 local criterion = nn.AbsCriterion();
 
 if (params.use_cuda) then
