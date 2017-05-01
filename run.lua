@@ -31,9 +31,9 @@ local params = {
     epochs = 50, 
     max_frames_per_directory = 100,
     learningRate = 0.1,
-    --learningRateDecay = 0.99,
-    --weightDecay = 1e-3,
-    --momentum = 1e-4,
+    learningRateDecay = 0.0001,
+    weightDecay = 0.001,
+    momentum = 0.0001,
     --dampening = 0,
     --nesterov = false,
     log_level = 8
@@ -43,11 +43,11 @@ local network = nn.Sequential()
 
 --network:add(nn.View(28*28):setNumInputDims(3))
 network:add(nn.View(28*28):setNumInputDims(3))
-network:add(nn.Linear(28*28, 30))
+network:add(nn.Linear(28*28, 64))
 network:add(nn.ReLU())
-network:add(nn.Linear(30, 30))
+network:add(nn.Linear(64, 64))
 network:add(nn.ReLU())
-network:add(nn.Linear(30, params.number_of_bins))
+network:add(nn.Linear(64, params.number_of_bins))
 network:add(nn.LogSoftMax())
 
 print(network)
