@@ -22,32 +22,49 @@ end
 
 local params = {
     use_cuda = true,
-    channels = 1,
+    channels = 3,
     display_plot = false,
     model_filename = 'sanity_vgg',
     load_saved_model = false,
     number_of_bins = 10,
-    minibatch_size = 16,
-    epochs = 50, 
-    max_frames_per_directory = 100,
+    minibatch_size = 2048,
+    epochs = 30, 
+    max_frames_per_directory = nil,
     learningRate = 0.1,
     learningRateDecay = 0.0001,
     weightDecay = 0.001,
     momentum = 0.0001,
     --dampening = 0,
     --nesterov = false,
-    log_level = 8
+    log_level = 7
 }
 
 local network = nn.Sequential()
 
 --network:add(nn.View(28*28):setNumInputDims(3))
-network:add(nn.View(28*28):setNumInputDims(3))
-network:add(nn.Linear(28*28, 64))
+
+network:add(nn.SpatialConvolution(3, 16, 3, 3, 1, 1, 1, 1))
+network:add(nn.SpatialBatchNormalization(16))
+network:add(nn.ReLU(true))
+network:add(nn.SpatialConvolution(16, 16, 3, 3, 1, 1, 1, 1))
+network:add(nn.SpatialBatchNormalization(16))
+network:add(nn.ReLU(true))
+network:add(nn.SpatialMaxPooling(2, 2, 2, 2))
+
+network:add(nn.SpatialConvolution(16, 32, 3, 3, 1, 1, 1, 1))
+network:add(nn.SpatialBatchNormalization(32))
+network:add(nn.ReLU(true))
+network:add(nn.SpatialConvolution(32, 32, 3, 3, 1, 1, 1, 1))
+network:add(nn.SpatialBatchNormalization(32))
+network:add(nn.ReLU(true))
+network:add(nn.SpatialMaxPooling(2, 2, 2, 2))
+
+network:add(nn.View(32*7*7):setNumInputDims(3))
+network:add(nn.Linear(32*7*7, 1024))
 network:add(nn.ReLU())
-network:add(nn.Linear(64, 64))
+network:add(nn.Linear(1024, 1024))
 network:add(nn.ReLU())
-network:add(nn.Linear(64, params.number_of_bins))
+network:add(nn.Linear(1024, params.number_of_bins))
 network:add(nn.LogSoftMax())
 
 print(network)
