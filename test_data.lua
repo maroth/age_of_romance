@@ -19,7 +19,15 @@ function test(neural_network, criterion, params, test_frame_dir)
     film_logger:style{'+-', '+-', '+-', '+-'}
     film_logger:display(params.display_plot)
 
+    local sorted_films = {}
     for _, film in pairs(films) do
+        table.insert(sorted_films, film)
+    end
+
+    table.sort(sorted_films, function(a, b) return a.normalized_date[1] < b.normalized_date[1] end)
+
+
+    for _, film in ipairs(sorted_films) do
         local sum_prediction = torch.DoubleTensor(params.number_of_bins)
         if params.use_cuda then
             sum_prediction = sum_prediction:cuda()

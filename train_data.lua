@@ -23,6 +23,7 @@ function train(neural_network, criterion, params, train_frame_dir)
     local frame_files, frame_films = build_frame_set(train_frame_dir, params.max_frames_per_directory, params.number_of_bins)
     sanity_check(neural_network, criterion, frame_size, params)
 
+
     log(10, "Starting training on data in directory " .. train_frame_dir)
     log(7, "Frame size: " ..  frame_size[1] .. " x " .. frame_size[2] .. " x " .. frame_size[3])
     log(10, "Number of frames: " ..  #frame_files)
@@ -120,24 +121,24 @@ function train_minibatch(neural_network, criterion, params, minibatch, epoch_ind
         else
             local_prediction = prediction[1]
         end
-        log(2, "Fed minibatch " .. minibatch.index .. " into network, prediction is " .. local_prediction)
+        --log(2, "Fed minibatch " .. minibatch.index .. " into network, prediction is " .. local_prediction)
 
         -- forward the prediction through the criterion to the the error
         -- local err = criterion:forward(prediction, minibatch.dates)
         local err = criterion:forward(prediction, minibatch.bins)
-        log(2, "Forwarded prediction for minibatch " .. minibatch.index .. " into criterion, error is " .. err)
+        --log(2, "Forwarded prediction for minibatch " .. minibatch.index .. " into criterion, error is " .. err)
 
         -- calculate the gradient error by feeding the prediction 
         -- and the ground truth backwards through the criterion
         -- local grad_criterion = criterion:backward(prediction, minibatch.dates)
         local grad_criterion = criterion:backward(prediction, minibatch.bins)
-        log(2, "Backwarded prediction for minibatch " .. minibatch.index .. " into criterion, mean grad_criterion is " .. grad_criterion:mean())
+        --log(2, "Backwarded prediction for minibatch " .. minibatch.index .. " into criterion, mean grad_criterion is " .. grad_criterion:mean())
 
         -- feed the gradients backward through the network
         neural_network:backward(minibatch.frames, grad_criterion)
 
         log(7, minibatch_summary(minibatch.index, number_of_minibatches, epoch_index, params.epochs, starting_time, err))
-        log(5, minibatch_detail(params.minibatch_size, prediction, minibatch.dates, err))
+        --log(5, minibatch_detail(params.minibatch_size, prediction, minibatch.dates, err))
         
         return err, weight_gradients
     end
@@ -151,7 +152,7 @@ end
 function get_number_of_minibatches(frame_count, minibatch_size)
     local number_of_minibatches = math.floor(#frame_files / minibatch_size)
     if number_of_minibatches == 0 then
-        log(10, "ERROR: frame count smaller than minibatch size")
+        print("ERROR: frame count smaller than minibatch size")
         os.exit()
     end
     return number_of_minibatches
@@ -169,9 +170,6 @@ function shuffle_data(frame_files, frame_films)
     end
     log(1, "shuffled inputs")
     return shuffled_data
-end
-
-function swap_current_and_next(current_minibatch, next_minibatch)
 end
 
 function create_minibatch_storage(minibatch_size, frame_size, number_of_bins)

@@ -7,8 +7,8 @@ pcall(require, "cunn")
 --train_frame_dir = "frames_211x176/"
 --test_frame_dir = "frames_211x176/"
 
-train_frame_dir = "/media/markus/Data/age_of_romance/sanity_check/"
-test_frame_dir = "/media/markus/Data/age_of_romance/sanity_check/"
+train_frame_dir = "./mnist/training/"
+test_frame_dir  = "./mnist/training/"
 
 -- command line argument 1 overrides training frame directory
 if arg[1] ~= nil then
@@ -22,76 +22,31 @@ end
 
 local params = {
     use_cuda = true,
-    display_plot = true,
+    display_plot = false,
     model_filename = 'sanity_vgg',
     load_saved_model = false,
-    number_of_bins = 5,
-    minibatch_size = 10,
-    epochs = 20, 
+    number_of_bins = 10,
+    minibatch_size = 16,
+    epochs = 300, 
     max_frames_per_directory = 10,
-    learningRate = 0.01,
-    learningRateDecay = 0,
-    weightDecay = 0,
-    dampening = 0,
-    nesterov = false,
-    momentum = 0.01,
-    log_level = 7,
+    learningRate = 1e-2,
+    learningRateDecay = 1e-4,
+    weightDecay = 1e-3,
+    momentum = 1e-4,
+    --dampening = 0,
+    --nesterov = false,
+    log_level = 7
 }
 
 local network = nn.Sequential()
 
--- building block
-local function ConvBNReLU(nInputPlane, nOutputPlane)
-    network:add(nn.SpatialConvolution(nInputPlane, nOutputPlane, 3,3, 1,1, 1,1))
-    network:add(nn.SpatialBatchNormalization(nOutputPlane,1e-3))
-    network:add(nn.ReLU(true))
-    return network
-end
+--network:add(nn.View(28*28):setNumInputDims(3))
+network:add(nn.Reshape(3*28*28))
+network:add(nn.Linear(28*28*3, 90))
+network:add(nn.Tanh(true))
+network:add(nn.Linear(90, params.number_of_bins))
 
--- Will use "ceil" MaxPooling because we want to save as much feature space as we can
-local MaxPooling = nn.SpatialMaxPooling
-
-ConvBNReLU(3,64):add(nn.Dropout(0.3))
-ConvBNReLU(64,64)
-network:add(MaxPooling(2,2,2,2):ceil())
-ConvBNReLU(64,128):add(nn.Dropout(0.4))
-ConvBNReLU(128,128)
-network:add(MaxPooling(2,2,2,2):ceil())
-ConvBNReLU(128,256):add(nn.Dropout(0.4))
-ConvBNReLU(256,256):add(nn.Dropout(0.4))
-ConvBNReLU(256,256)
-network:add(MaxPooling(2,2,2,2):ceil())
-ConvBNReLU(256,512):add(nn.Dropout(0.4))
-ConvBNReLU(512,512):add(nn.Dropout(0.4))
-ConvBNReLU(512,512)
-network:add(MaxPooling(2,2,2,2):ceil())
-ConvBNReLU(512,512):add(nn.Dropout(0.4))
-ConvBNReLU(512,512):add(nn.Dropout(0.4))
-ConvBNReLU(512,512)
-network:add(MaxPooling(2,2,2,2):ceil())
-ConvBNReLU(512,512):add(nn.Dropout(0.4))
-ConvBNReLU(512,512):add(nn.Dropout(0.4))
-ConvBNReLU(512,512)
-network:add(MaxPooling(2,2,2,2):ceil())
-ConvBNReLU(512,512):add(nn.Dropout(0.4))
-ConvBNReLU(512,512):add(nn.Dropout(0.4))
-ConvBNReLU(512,512)
-network:add(MaxPooling(2,2,2,2):ceil())
-ConvBNReLU(512,512):add(nn.Dropout(0.4))
-ConvBNReLU(512,512):add(nn.Dropout(0.4))
-ConvBNReLU(512,512)
-network:add(MaxPooling(2,2,2,2):ceil())
-ConvBNReLU(512,512):add(nn.Dropout(0.4))
-ConvBNReLU(512,512):add(nn.Dropout(0.4))
-ConvBNReLU(512,512)
-network:add(MaxPooling(2,2,2,2):ceil())
-network:add(nn.View(512))
-network:add(nn.Dropout(0.5))
-network:add(nn.Linear(512,512))
-network:add(nn.BatchNormalization(512))
-network:add(nn.ReLU(true))
-network:add(nn.Dropout(0.5))
-network:add(nn.Linear(512, params.number_of_bins))
+print(network)
 
 local criterion = nn.CrossEntropyCriterion();
 
