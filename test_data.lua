@@ -26,8 +26,11 @@ function test(neural_network, criterion, params, test_frame_dir)
 
     table.sort(sorted_films, function(a, b) return a.normalized_date[1] < b.normalized_date[1] end)
 
+    local correct_predictions = 0
+    local total_predictions = 0
 
     for _, film in ipairs(sorted_films) do
+
         local sum_prediction = torch.DoubleTensor(params.number_of_bins)
         if params.use_cuda then
             sum_prediction = sum_prediction:cuda()
@@ -35,7 +38,7 @@ function test(neural_network, criterion, params, test_frame_dir)
         local frame_count = 0
         local predictions = {}
         for frame_index, frame_dir in pairs(film.frames) do
-            local frame = image.load(frame_dir, 3, 'double')
+            local frame = image.load(frame_dir, params.channels, 'double')
             local minibatch = torch.DoubleTensor(1, frame:size(1), frame:size(2), frame:size(3))
             if (params.use_cuda) then
                 minibatch = minibatch:cuda()
@@ -43,11 +46,19 @@ function test(neural_network, criterion, params, test_frame_dir)
             end
             minibatch[1] = frame
             log(1, "feeding frame " .. frame_dir .. " to test network")
+
             local prediction = neural_network:forward(minibatch)
             --log(2, "Fed frame " .. frame_index .. " into network, prediction is " .. prediction)
             sum_prediction = torch.add(sum_prediction, prediction)
             frame_count = frame_count + 1
             table.insert(predictions, prediction)
+
+            local _, index = torch.max(prediction, 2)
+            if index[1][1] == film.bin then
+                correct_predictions = correct_predictions + 1
+            end
+            total_predictions = total_predictions + 1
+
         end
 
         local mean_prediction = sum_prediction / frame_count
@@ -74,6 +85,8 @@ function test(neural_network, criterion, params, test_frame_dir)
             film_logger:plot()
         end
     end
+
+    log(8, "\ntotal accuracy: " .. correct_predictions / total_predictions)
 
     --local mean_error = sum_mean_error / #films
     --local median_error = sum_median_error / #films

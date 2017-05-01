@@ -12,6 +12,9 @@ local threads = require 'threads'
 threads.Threads.serialization('threads.sharedserialize')
 
 function train(neural_network, criterion, params, train_frame_dir) 
+
+    weights, weight_gradients = neural_network:getParameters()
+
     set_log_level(params.log_level)
 
     if (params.load_saved_model) then
@@ -19,7 +22,7 @@ function train(neural_network, criterion, params, train_frame_dir)
         neural_network = torch.load(params.model_filename)
     end
 
-    local frame_size = get_frame_size(train_frame_dir)
+    local frame_size = get_frame_size(train_frame_dir, params)
     local frame_files, frame_films = build_frame_set(train_frame_dir, params.max_frames_per_directory, params.number_of_bins)
     sanity_check(neural_network, criterion, frame_size, params)
 
@@ -68,7 +71,7 @@ function train_epoch(neural_network, criterion, params, frame_files, frame_films
             load_minibatch(params, frame_size, next_minibatch, shuffled_data)
         end)
 
-        err = train_minibatch(neural_network, criterion, params, current_minibatch, epoch_index, number_of_minibatches, starting_time)
+        local err = train_minibatch(neural_network, criterion, params, current_minibatch, epoch_index, number_of_minibatches, starting_time)
         err_sum = err_sum + err
 
         pool:synchronize()
@@ -103,7 +106,6 @@ function train_epoch(neural_network, criterion, params, frame_files, frame_films
 end
 
 function train_minibatch(neural_network, criterion, params, minibatch, epoch_index, number_of_minibatches, starting_time)
-    local weights, weight_gradients = neural_network:getParameters()
 
     function feval(new_weights)
         -- copy new weights, not sure if this is necessary

@@ -22,33 +22,38 @@ end
 
 local params = {
     use_cuda = true,
+    channels = 1,
     display_plot = false,
     model_filename = 'sanity_vgg',
     load_saved_model = false,
     number_of_bins = 10,
     minibatch_size = 16,
-    epochs = 300, 
-    max_frames_per_directory = 10,
-    learningRate = 1e-2,
-    learningRateDecay = 1e-4,
-    weightDecay = 1e-3,
-    momentum = 1e-4,
+    epochs = 50, 
+    max_frames_per_directory = 100,
+    learningRate = 0.1,
+    --learningRateDecay = 0.99,
+    --weightDecay = 1e-3,
+    --momentum = 1e-4,
     --dampening = 0,
     --nesterov = false,
-    log_level = 7
+    log_level = 8
 }
 
 local network = nn.Sequential()
 
 --network:add(nn.View(28*28):setNumInputDims(3))
-network:add(nn.Reshape(3*28*28))
-network:add(nn.Linear(28*28*3, 90))
-network:add(nn.Tanh(true))
-network:add(nn.Linear(90, params.number_of_bins))
+network:add(nn.View(28*28):setNumInputDims(3))
+network:add(nn.Linear(28*28, 30))
+network:add(nn.ReLU())
+network:add(nn.Linear(30, 30))
+network:add(nn.ReLU())
+network:add(nn.Linear(30, params.number_of_bins))
+network:add(nn.LogSoftMax())
 
 print(network)
 
-local criterion = nn.CrossEntropyCriterion();
+--local criterion = nn.CrossEntropyCriterion();
+local criterion = nn.ClassNLLCriterion()
 
 if (params.use_cuda) then
     network = network:cuda()

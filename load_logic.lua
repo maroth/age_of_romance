@@ -1,13 +1,13 @@
 local json = require 'cjson'
 
-function get_frame_size(frame_dir)
+function get_frame_size(frame_dir, params)
     for film_dir in lfs.dir(frame_dir) do    
         local info_file_path = frame_dir .. "/" .. film_dir .. "/info.json"
         if file_exists(info_file_path) then
             for frame_file in lfs.dir(frame_dir .. "/" .. film_dir) do
                 if (string.ends(frame_file, ".png")) then
                     local image_file_name = frame_dir .. film_dir .. "/" .. frame_file
-                    return image.load(image_file_name, 3, 'double'):size()
+                    return image.load(image_file_name, params.channels, 'double'):size()
                 end
             end
         end

@@ -95,7 +95,7 @@ function load_minibatch(params, frame_size, minibatch, shuffled_data)
     for intra_minibatch_index = 1, params.minibatch_size do
         local abs_index = minibatch.index + intra_minibatch_index - 1
         log(1, "trying to load image to memory: " .. shuffled_data.files[abs_index])
-        local frame = image.load(shuffled_data.files[abs_index], 3, 'double')
+        local frame = image.load(shuffled_data.files[abs_index], params.channels, 'double')
         local film = shuffled_data.films[abs_index]
         minibatch.frames[intra_minibatch_index] = frame
         minibatch.dates[intra_minibatch_index] = film.normalized_date
