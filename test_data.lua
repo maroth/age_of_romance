@@ -6,7 +6,28 @@ require 'load_logic'
 require 'helpers'
 require 'optim'
 
-function test(neural_network, criterion, params, test_frame_dir) 
+function test(neural_network, criterion, params, test_frame_dir, validate_frame_dir, train_frame_dir) 
+    local test_predictions, test_count = test_set(neural_network, criterion, params, test_frame_dir)
+    local validate_predictions, validate_count = test_set(neural_network, criterion, params, validate_frame_dir)
+    local train_predictions, train_count  = test_set(neural_network, criterion, params, train_frame_dir)
+
+    logger = optim.Logger("test.log")
+    logger:setNames{'Test', 'Validate', 'Train'}
+    logger:style{'+-', '+-', '+-'}
+    logger:display(false)
+    for i = 1, params.number_of_bins do
+        local test_accuracy = test_predictions[i] / test_count
+        local validate_accuracy = validate_predictions[i] / validate_count
+        local train_accuracy = train_predictions[i] / train_count
+        log(8, "\ntest top " .. i .. " accuracy: " .. test_accuracy)
+        log(8, "\nvalidate top " .. i .. " accuracy: " .. validate_accuracy)
+        log(8, "\ntrain top " .. i .. " accuracy: " .. train_accuracy)
+        logger:add{test_accuracy, validate_accuracy, train_accuracy}
+    end
+    logger:plot()
+end
+
+function test_set(neural_network, criterion, params, test_frame_dir, validate_frame_dir, train_frame_dir) 
     set_log_level(params.log_level)
     log(3, "\n\nTesting data with files from " .. test_frame_dir)
     local films = load_films(test_frame_dir, params.max_frames_per_directory, params.number_of_bins)
@@ -60,7 +81,7 @@ function test(neural_network, criterion, params, test_frame_dir)
                     end
                 end
 
-                print(3, "correct bin in top " .. best_prediction .. " probabilities")
+                log(3, "correct bin in top " .. best_prediction .. " probabilities")
 
                 frame_count = frame_count + 1
                 total_predictions = total_predictions + 1
@@ -77,16 +98,6 @@ function test(neural_network, criterion, params, test_frame_dir)
         log(7, "remaining time: " .. remaining_time)
     end
 
-
-    logger = optim.Logger("test.log")
-    logger:setNames{''}
-    logger:style{'+-'}
-    logger:display(false)
-    for i = 1, params.number_of_bins do
-        local accuracy = correct_predictions[i] / total_predictions
-        log(8, "\ntotal top " .. i .. " accuracy: " .. accuracy)
-        logger:add{accuracy}
-    end
-    logger:plot()
+    return correct_predictions, total_predictions
 end
 

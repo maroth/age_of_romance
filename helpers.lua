@@ -53,11 +53,12 @@ function minibatch_detail(minibatch_size, prediction, minibatch_dates, err)
     return message
 end
 
-function epoch_summary(epoch_index, epochs, err_sum, minibatch_size, starting_time)
+function epoch_summary(epoch_index, epochs, train_error, validate_error, minibatch_size, starting_time)
     local fraction_done = epoch_index / epochs
     local estimated_remaining_time = get_remaining_time(starting_time, fraction_done)
     local message = "[" .. epoch_index .. "/" .. epochs .. "] "
-    message = message .. "Error rate: " .. err_sum / minibatch_size
+    message = message .. "Training error: " .. train_error / minibatch_size
+    message = message .. "\tValidation error: " .. validate_error / minibatch_size
     message = message .. "\tRemaining time: " .. estimated_remaining_time
     return message .. "\n"
 end
