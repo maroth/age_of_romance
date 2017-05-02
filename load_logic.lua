@@ -27,21 +27,45 @@ function parse_info_file(info_file_path)
     return film_info
 end
 
+function count_frames_in_dir(dir)
+    local total_frames = 0
+    for frame_file in lfs.dir(dir) do
+        if (string.ends(frame_file, ".png")) then
+            total_frames = total_frames + 1
+        end
+    end
+    return total_frames
+end
+
+function frame_limits(total_frames, max_frames_per_directory)
+    local from_frame = 1
+    local to_frame = total_frames
+    if max_frames_per_directory then
+        from_frame = (total_frames / 2) - math.floor((max_frames_per_directory / 2))
+        to_frame = (total_frames / 2) + math.ceil((max_frames_per_directory / 2))
+    end
+    return from_frame, to_frame
+end
+
 function load_films(frame_dir, max_frames_per_directory, number_of_bins)
     films = {}
     for film_dir in lfs.dir(frame_dir) do    
         local info_file_path = frame_dir .. film_dir .. "/info.json"
         if file_exists(info_file_path) then
             local film  = parse_info_file(info_file_path)
-            local frames_count = 0
+
+            local total_frames = count_frames_in_dir(frame_dir .. film_dir)
+            local from_frame, to_frame = frame_limits(total_frames, max_frames_per_directory)
+
             film.normalized_date = normalize_date(parse_date(film.date))
             film.bin_vector = create_probability_vector(film.normalized_date[1], number_of_bins)
             film.bin = get_bin(film.normalized_date[1], number_of_bins)
             film.frames = {}
+            local frame_count = 0
             for frame_file in lfs.dir(frame_dir .. film_dir) do
-                if max_frames_per_directory == nil or max_frames_per_directory > frames_count then
-                    if (string.ends(frame_file, ".png")) then
-                        frames_count = frames_count + 1
+                if (string.ends(frame_file, ".png")) then
+                    frames_count = frames_count + 1
+                    if frames_count >= from_frame and frames_count <= to_frame then 
                         local frame_file_dir = frame_dir .. film_dir .. "/" .. frame_file
                         local frame_id = string.gsub(frame_file, "frame", "")
                         frame_id = string.gsub(frame_id, ".png", "")
@@ -63,14 +87,18 @@ function build_frame_set(frame_dir, max_frames_per_directory, number_of_bins)
         local info_file_path = frame_dir .. "/" .. film_dir .. "/info.json"
         if file_exists(info_file_path) then
             local film  = parse_info_file(info_file_path)
+
+            local total_frames = count_frames_in_dir(frame_dir .. film_dir)
+            local from_frame, to_frame = frame_limits(total_frames, max_frames_per_directory)
+
             film.normalized_date = normalize_date(parse_date(film.date))
             film.bin_vector = create_probability_vector(film.normalized_date[1], number_of_bins)
             film.bin = get_bin(film.normalized_date[1], number_of_bins)
             local frames_count = 0
             for frame_file in lfs.dir(frame_dir .. "/" .. film_dir) do
-                if max_frames_per_directory == nil or max_frames_per_directory > frames_count then
-                    if (string.ends(frame_file, ".png")) then
-                        frames_count = frames_count + 1
+                if (string.ends(frame_file, ".png")) then
+                    frames_count = frames_count + 1
+                    if frames_count >= from_frame and frames_count <= to_frame then 
                         index = index + 1
                         if index % 1000 == 0 then
                             update_output("loading frame: " .. index)
