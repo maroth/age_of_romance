@@ -11,6 +11,10 @@ require 'test_network'
 local threads = require 'threads'
 threads.Threads.serialization('threads.sharedserialize')
 
+local current_minibatch = {}
+local next_minibatch = {}
+
+
 function train(neural_network, criterion, params, train_frame_dir, validate_frame_dir) 
 
     weights, weight_gradients = neural_network:getParameters()
@@ -19,9 +23,12 @@ function train(neural_network, criterion, params, train_frame_dir, validate_fram
 
     local frame_size = get_frame_size(train_frame_dir, params)
     local frame_files, frame_films = build_frame_set(train_frame_dir, params.max_frames_per_directory, params.number_of_bins)
+    current_minibatch, next_minibatch = create_minibatch_storage(params.minibatch_size, frame_size, params.number_of_bins)
+
     sanity_check(neural_network, criterion, frame_size, params)
     local validate_files, validate_films = build_frame_set(validate_frame_dir, params.max_validate_frames_per_directory, params.number_of_bins)
 
+    current_minibatch.frames = current_minibatch.frames:cuda()
 
     log(10, "Starting training on data in directory " .. train_frame_dir)
     log(7, "Frame size: " ..  frame_size[1] .. " x " .. frame_size[2] .. " x " .. frame_size[3])
@@ -36,10 +43,15 @@ function train(neural_network, criterion, params, train_frame_dir, validate_fram
 
     local pool = threads.Threads(1, function(thread_id) end)
     local starting_time = os.time()
+    local number_of_train_minibatches = get_number_of_minibatches(#frame_files, params.minibatch_size)
+    local number_of_validate_minibatches = get_number_of_minibatches(#validate_files, params.minibatch_size)
     for epoch_index = 1, params.epochs do
-        local train_err = train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time, epoch_index)
+        current_minibatch.index = 1
+        next_minibatch.index = 2
 
-        local validate_err = validate(neural_network, criterion, params, validate_files, validate_films, frame_size, pool)
+        local train_err = train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time, epoch_index, number_of_train_minibatches)
+
+        local validate_err = validate(neural_network, criterion, params, validate_files, validate_films, frame_size, pool, number_of_validate_minibatches)
 
         log(9, epoch_summary(epoch_index, params.epochs, train_err, validate_err, params.minibatch_size, starting_time))
 
@@ -56,21 +68,14 @@ function train(neural_network, criterion, params, train_frame_dir, validate_fram
     return neural_network
 end
 
-function train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time, epoch_index)
-    local shuffled_data = shuffle_data(frame_files, frame_films)
-    local current_minibatch, next_minibatch = create_minibatch_storage(params.minibatch_size, frame_size, params.number_of_bins)
+function train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time, epoch_index, number_of_train_minibatches)
 
-    if (params.use_cuda) then
-        current_minibatch.frames = current_minibatch.frames:cuda()
-        current_minibatch.dates = current_minibatch.dates:cuda()
-        current_minibatch.probability_vectors = current_minibatch.probability_vectors:cuda()
-    end
+    local shuffled_data = shuffle_data(frame_files, frame_films, number_of_train_minibatches)
 
     load_minibatch(params, frame_size, current_minibatch, shuffled_data)
 
     local err_sum = 0
-    local number_of_minibatches = get_number_of_minibatches(#frame_files, params.minibatch_size)
-    for minibatch_index = 1, number_of_minibatches - 1 do
+    for minibatch_index = 1, number_of_train_minibatches - 1 do
 
         pool:addjob(function()
             local image = require 'image'
@@ -79,54 +84,31 @@ function train_epoch(neural_network, criterion, params, frame_files, frame_films
             load_minibatch(params, frame_size, next_minibatch, shuffled_data)
         end)
 
-        local err = train_minibatch(neural_network, criterion, params, current_minibatch, epoch_index, number_of_minibatches, starting_time)
+        local err = train_minibatch(neural_network, criterion, params, current_minibatch, epoch_index, number_of_train_minibatches, starting_time)
         err_sum = err_sum + err
 
         pool:synchronize()
 
-        if (params.use_cuda) then
-            current_minibatch.frames = torch.CudaTensor(next_minibatch.frames:size()):copy(next_minibatch.frames:cuda())
-            current_minibatch.dates = torch.CudaTensor(next_minibatch.dates:size()):copy(next_minibatch.dates:cuda())
-            current_minibatch.probability_vectors = torch.CudaTensor(next_minibatch.probability_vectors:size()):copy(next_minibatch.probability_vectors:cuda())
-
-        else
-            current_minibatch.frames = torch.DoubleTensor(next_minibatch.frames:size()):copy(next_minibatch.frames)
-            current_minibatch.dates = torch.DoubleTensor(next_minibatch.dates:size()):copy(next_minibatch.dates)
-            current_minibatch.probability_vectors = torch.DoubleTensor(next_minibatch.probability_vectors:size()):copy(next_minibatch.probability_vectors)
-        end
-
+        current_minibatch.frames = torch.CudaTensor(next_minibatch.frames:size()):copy(next_minibatch.frames:cuda())
         current_minibatch.bins = torch.LongTensor(next_minibatch.bins):copy(next_minibatch.bins)
 
         current_minibatch.index = next_minibatch.index 
         next_minibatch.index = next_minibatch.index + 1
     end
 
-    err_sum = err_sum + train_minibatch(neural_network, criterion, params, current_minibatch, epoch_index, number_of_minibatches, starting_time)
-
+    err_sum = err_sum + train_minibatch(neural_network, criterion, params, current_minibatch, epoch_index, number_of_train_minibatches, starting_time)
 
     return err_sum
 
 end
 
-function validate(neural_network, criterion, params, validate_files, validate_films, frame_size, pool)
-
-    local current_minibatch, next_minibatch = create_minibatch_storage(params.minibatch_size, frame_size, params.number_of_bins)
+function validate(neural_network, criterion, params, validate_files, validate_films, frame_size, pool, number_of_validate_minibatches)
 
     local data = {files =  validate_files, films =  validate_films}
-
-
-    if (params.use_cuda) then
-        current_minibatch.frames = current_minibatch.frames:cuda()
-        current_minibatch.dates = current_minibatch.dates:cuda()
-        current_minibatch.probability_vectors = current_minibatch.probability_vectors:cuda()
-    end
-
-
     load_minibatch(params, frame_size, current_minibatch, data)
 
     local err_sum = 0
-    local number_of_minibatches = get_number_of_minibatches(#validate_files, params.minibatch_size)
-    for minibatch_index = 1, number_of_minibatches - 1 do
+    for minibatch_index = 1, number_of_validate_minibatches - 1 do
 
         pool:addjob(function()
             local image = require 'image'
@@ -140,15 +122,7 @@ function validate(neural_network, criterion, params, validate_files, validate_fi
 
         pool:synchronize()
 
-        if (params.use_cuda) then
-            current_minibatch.frames = torch.CudaTensor(next_minibatch.frames:size()):copy(next_minibatch.frames:cuda())
-            current_minibatch.dates = torch.CudaTensor(next_minibatch.dates:size()):copy(next_minibatch.dates:cuda())
-
-        else
-            current_minibatch.frames = torch.DoubleTensor(next_minibatch.frames:size()):copy(next_minibatch.frames)
-            current_minibatch.dates = torch.DoubleTensor(next_minibatch.dates:size()):copy(next_minibatch.dates)
-        end
-
+        current_minibatch.frames = torch.CudaTensor(next_minibatch.frames:size()):copy(next_minibatch.frames:cuda())
         current_minibatch.bins = torch.LongTensor(next_minibatch.bins):copy(next_minibatch.bins)
 
         current_minibatch.index = next_minibatch.index 
@@ -196,11 +170,9 @@ function train_minibatch(neural_network, criterion, params, minibatch, epoch_ind
         neural_network:backward(minibatch.frames, grad_criterion)
 
         log(7, minibatch_summary(minibatch.index, number_of_minibatches, epoch_index, params.epochs, starting_time, err))
-        --log(5, minibatch_detail(params.minibatch_size, prediction, minibatch.dates, err))
         
         return err, weight_gradients
     end
-
 
     local new_weights, err = optim.sgd(feval, weights, params)
     
@@ -219,7 +191,7 @@ function validate_minibatch(neural_network, criterion, params, minibatch)
 end
 
 function get_number_of_minibatches(frame_count, minibatch_size)
-    local number_of_minibatches = math.floor(#frame_files / minibatch_size)
+    local number_of_minibatches = math.floor(frame_count / minibatch_size)
     if number_of_minibatches == 0 then
         print("ERROR: frame count smaller than minibatch size")
         os.exit()
@@ -237,24 +209,20 @@ function shuffle_data(frame_files, frame_films)
         shuffled_data.files[index] = frame_files[randomized_indexes[index]]
         shuffled_data.films[index] = frame_films[randomized_indexes[index]]
     end
-    log(1, "shuffled inputs")
+    --log(1, "shuffled inputs")
     return shuffled_data
 end
 
 function create_minibatch_storage(minibatch_size, frame_size, number_of_bins)
     local current_minibatch = {
         frames = torch.DoubleTensor(minibatch_size, frame_size[1], frame_size[2], frame_size[3]),
-        dates = torch.DoubleTensor(minibatch_size),
         bins = torch.LongTensor(minibatch_size),
-        probability_vectors = torch.DoubleTensor(minibatch_size, number_of_bins),
         index = 1
     }
 
     local next_minibatch = {
         frames = torch.DoubleTensor(minibatch_size, frame_size[1], frame_size[2], frame_size[3]),
-        dates = torch.DoubleTensor(minibatch_size),
         bins = torch.LongTensor(minibatch_size),
-        probability_vectors = torch.DoubleTensor(minibatch_size, number_of_bins),
         index = 2
     }
     return current_minibatch, next_minibatch

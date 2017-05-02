@@ -61,7 +61,7 @@ function load_films(frame_dir, max_frames_per_directory, number_of_bins)
             film.bin_vector = create_probability_vector(film.normalized_date[1], number_of_bins)
             film.bin = get_bin(film.normalized_date[1], number_of_bins)
             film.frames = {}
-            local frame_count = 0
+            local frames_count = 0
             for frame_file in lfs.dir(frame_dir .. film_dir) do
                 if (string.ends(frame_file, ".png")) then
                     frames_count = frames_count + 1

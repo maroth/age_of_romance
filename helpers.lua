@@ -36,23 +36,6 @@ function minibatch_summary(minibatch_index, number_of_minibatches, epoch_index, 
     return message
 end
 
-function minibatch_detail(minibatch_size, prediction, minibatch_dates, err)
-    local message = ""
-    for i = 1, minibatch_size do
-        local local_prediction = 0
-        if (prediction:size(1) > 1) then
-            local_prediction = prediction[i][1]
-        else
-            local_prediction = prediction[i]
-        end
-        message = message .. "\nprediction: " .. string.format("%.3f", local_prediction)
-        message = message .. " \ttruth: " .. string.format("%.3f", minibatch_dates[i])
-        message = message .. " \tdiff: " ..  string.format("%.3f", math.abs(local_prediction - minibatch_dates[i]))
-        message = message .. " \ttotal error: " .. string.format("%.3f", err)
-    end
-    return message
-end
-
 function epoch_summary(epoch_index, epochs, train_error, validate_error, minibatch_size, starting_time)
     local fraction_done = epoch_index / epochs
     local estimated_remaining_time = get_remaining_time(starting_time, fraction_done)
@@ -91,20 +74,18 @@ function median(list)
 end
 
 function load_minibatch(params, frame_size, minibatch, shuffled_data)
-    log(3, "Load thread: starting loading for minibatch " .. minibatch.index)
+    --log(3, "Load thread: starting loading for minibatch " .. minibatch.index)
 
     for intra_minibatch_index = 1, params.minibatch_size do
         local abs_index = minibatch.index + intra_minibatch_index - 1
-        log(1, "trying to load image to memory: " .. shuffled_data.files[abs_index])
+        --log(1, "trying to load image to memory: " .. shuffled_data.files[abs_index])
         local frame = image.load(shuffled_data.files[abs_index], params.channels, 'double')
         local film = shuffled_data.films[abs_index]
         minibatch.frames[intra_minibatch_index] = frame
-        minibatch.dates[intra_minibatch_index] = film.normalized_date
         minibatch.bins[intra_minibatch_index] = film.bin
-        minibatch.probability_vectors[intra_minibatch_index] = film.bin_vector
-        log(1, "loaded frame with normalized date " .. film.normalized_date[1])
+        --log(1, "loaded frame with normalized date " .. film.normalized_date[1])
     end
 
-    log(3, "Load thread: loading complete for minibatch " .. minibatch.index)
+    --log(3, "Load thread: loading complete for minibatch " .. minibatch.index)
 end
 
