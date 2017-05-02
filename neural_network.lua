@@ -1,4 +1,5 @@
 require 'nn'
+require 'cunn'
 
 function vgg_105_88_tiny(params)
     local vgg = nn.Sequential()
@@ -98,6 +99,102 @@ function vgg_105_88_small(params)
     classifier:add(nn.ReLU(true))
     classifier:add(nn.Dropout(0.5))
     classifier:add(nn.Linear(128, params.number_of_bins))
+    classifier:add(nn.LogSoftMax())
+    vgg:add(classifier)
+
+    -- initialize weights and bias of convoluations
+    local function MSRinit(net)
+        for k, v in pairs(net:findModules('nn.SpatialConvolution')) do
+            local n = v.kW * v.kH * v.nOutputPlane
+            v.weight:normal(0, math.sqrt(2 / n))
+            v.bias:zero()
+        end
+    end
+
+    MSRinit(vgg)
+
+    return vgg
+end
+
+function alexnet(params)
+    local SpatialConvolution = nn.SpatialConvolution
+    local SpatialMaxPooling = nn.SpatialMaxPooling
+
+    local features = nn.Sequential()
+    features:add(SpatialConvolution(3,64,11,11,4,4,2,2)) 
+    features:add(nn.ReLU(true))
+    features:add(SpatialMaxPooling(3,3,2,2))             
+    features:add(SpatialConvolution(64,192,5,5,1,1,2,2))
+    features:add(nn.ReLU(true))
+    features:add(SpatialMaxPooling(3,3,2,2))            
+    features:add(SpatialConvolution(192,384,3,3,1,1,1,1))
+    features:add(nn.ReLU(true))
+    features:add(SpatialConvolution(384,256,3,3,1,1,1,1)) 
+    features:add(nn.ReLU(true))
+    features:add(SpatialConvolution(256,256,3,3,1,1,1,1)) 
+    features:add(nn.ReLU(true))
+    features:add(SpatialMaxPooling(3,3,2,2))              
+
+    features:add(nn.View(256*4*5):setNumInputDims(3))
+    features:add(nn.Dropout(0.5))
+    features:add(nn.Linear(256*4*5, 4096))
+    features:add(nn.Threshold(0, 1e-6))
+    features:add(nn.Dropout(0.5))
+    features:add(nn.Linear(4096, 4096))
+    features:add(nn.Threshold(0, 1e-6))
+    features:add(nn.Linear(4096, 50))
+    features:add(nn.LogSoftMax())
+
+    print(features)
+
+    return features
+end
+
+function vgg_211_176(params)
+    local vgg = nn.Sequential()
+
+    local function ConvBNReLU(nInputPlane, nOutputPlane)
+        vgg:add(nn.SpatialConvolution(nInputPlane, nOutputPlane, 3, 3, 1, 1, 1, 1))
+        vgg:add(nn.SpatialBatchNormalization(nOutputPlane, 1e-3))
+        vgg:add(nn.ReLU(true))
+        return vgg
+    end
+
+    ConvBNReLU(3,64):add(nn.Dropout(0.3))
+    ConvBNReLU(64,64)
+    vgg:add(nn.SpatialMaxPooling(2, 2, 2, 2))
+
+    ConvBNReLU(64,128):add(nn.Dropout(0.4))
+    ConvBNReLU(128,128)
+    vgg:add(nn.SpatialMaxPooling(2, 2, 2, 2))
+
+    ConvBNReLU(128,256):add(nn.Dropout(0.4))
+    ConvBNReLU(256,256):add(nn.Dropout(0.4))
+    ConvBNReLU(256,256)
+    vgg:add(nn.SpatialMaxPooling(2,2,2,2))
+
+    ConvBNReLU(256,512):add(nn.Dropout(0.4))
+    ConvBNReLU(512,512):add(nn.Dropout(0.4))
+    ConvBNReLU(512,512)
+    vgg:add(nn.SpatialMaxPooling(2,2,2,2))
+
+    ConvBNReLU(512,512):add(nn.Dropout(0.4))
+    ConvBNReLU(512,512):add(nn.Dropout(0.4))
+    ConvBNReLU(512,512)
+    vgg:add(nn.SpatialMaxPooling(2,2,2,2))
+
+    vgg:add(nn.View(512):setNumInputDims(3))
+
+    classifier = nn.Sequential()
+    classifier:add(nn.Linear(4096,4096))
+    classifier:add(nn.BatchNormalization(4096))
+    classifier:add(nn.Dropout(0.5))
+    classifier:add(nn.ReLU(true))
+    classifier:add(nn.Linear(4096,4096))
+    classifier:add(nn.BatchNormalization(4096))
+    classifier:add(nn.Dropout(0.5))
+    classifier:add(nn.ReLU(true))
+    classifier:add(nn.Linear(4096, params.number_of_bins))
     classifier:add(nn.LogSoftMax())
     vgg:add(classifier)
 

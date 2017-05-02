@@ -1,8 +1,11 @@
 import os
 
-frame_dir = "frames_105x88"
+frame_dir = "frames_211x176"
 
 def create_distributed():
+    os.system("mkdir train")
+    os.system("mkdir test")
+    os.system("mkdir validate")
     for _, dirs, _ in os.walk(frame_dir):
         for subdir in dirs:
             mkdir_command = "mkdir validate/" + subdir

@@ -65,6 +65,7 @@ function train(neural_network, criterion, params, train_frame_dir, validate_fram
 
     logger:plot()
 
+    torch.save("models/" .. params.model_filename .. epoch_index .. ".model", neural_network)
     return neural_network
 end
 
