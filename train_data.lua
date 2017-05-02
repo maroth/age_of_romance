@@ -17,11 +17,6 @@ function train(neural_network, criterion, params, train_frame_dir)
 
     set_log_level(params.log_level)
 
-    if (params.load_saved_model) then
-        log(10, "loading model from " .. params.model_filename)
-        neural_network = torch.load(params.model_filename)
-    end
-
     local frame_size = get_frame_size(train_frame_dir, params)
     local frame_files, frame_films = build_frame_set(train_frame_dir, params.max_frames_per_directory, params.number_of_bins)
     sanity_check(neural_network, criterion, frame_size, params)
@@ -102,7 +97,7 @@ function train_epoch(neural_network, criterion, params, frame_files, frame_films
         logger:plot()
     end
 
-    torch.save(params.model_filename .. epoch_index .. ".model", neural_network)
+    torch.save("models/" .. params.model_filename .. epoch_index .. ".model", neural_network)
 end
 
 function train_minibatch(neural_network, criterion, params, minibatch, epoch_index, number_of_minibatches, starting_time)

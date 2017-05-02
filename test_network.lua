@@ -12,7 +12,7 @@ function sanity_check(test_network, test_criterion, frame_size, params)
 
     if (params.use_cuda) then
         value = value:cuda()
-        -- target = target:cuda()
+        target = target:cuda()
     end
     
     local test_prediction = test_network:forward(value)

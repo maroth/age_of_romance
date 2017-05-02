@@ -30,7 +30,7 @@ end
 function load_films(frame_dir, max_frames_per_directory, number_of_bins)
     films = {}
     for film_dir in lfs.dir(frame_dir) do    
-        local info_file_path = frame_dir .. "/" .. film_dir .. "/info.json"
+        local info_file_path = frame_dir .. film_dir .. "/info.json"
         if file_exists(info_file_path) then
             local film  = parse_info_file(info_file_path)
             local frames_count = 0
@@ -38,11 +38,11 @@ function load_films(frame_dir, max_frames_per_directory, number_of_bins)
             film.bin_vector = create_probability_vector(film.normalized_date[1], number_of_bins)
             film.bin = get_bin(film.normalized_date[1], number_of_bins)
             film.frames = {}
-            for frame_file in lfs.dir(frame_dir .. "/" .. film_dir) do
+            for frame_file in lfs.dir(frame_dir .. film_dir) do
                 if max_frames_per_directory == nil or max_frames_per_directory > frames_count then
                     if (string.ends(frame_file, ".png")) then
                         frames_count = frames_count + 1
-                        local frame_file_dir = frame_dir .. "/" .. film_dir .. "/" .. frame_file
+                        local frame_file_dir = frame_dir .. film_dir .. "/" .. frame_file
                         local frame_id = string.gsub(frame_file, "frame", "")
                         frame_id = string.gsub(frame_id, ".png", "")
                         film.frames[tonumber(frame_id)] = frame_file_dir
