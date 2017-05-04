@@ -3,8 +3,10 @@ local status, lfs = pcall(require, "cunn")
 
 function sanity_check(test_network, test_criterion, frame_size, params)
 
-    local value = torch.DoubleTensor(params.minibatch_size, frame_size[1], frame_size[2], frame_size[3])
+    local value = torch.DoubleTensor(params.minibatch_size, frame_size[1], frame_size[2])
     local target = torch.LongTensor(params.minibatch_size)
+
+    print(value:size())
 
     for index = 1, params.minibatch_size do
         target[index] = math.random(1, params.number_of_bins)

@@ -20,17 +20,17 @@ test_frame_dir = "frames_211x176_distributed/test/"
 local params = {
     use_cuda = true,
     channels = 3,
-    model_filename = 'alexnet',
+    model_filename = 'colorspace',
     save_frequency = 5,
     number_of_bins = 50,
-    minibatch_size = 500,
-    epochs = 1000,
-    max_frames_per_directory = nil,
-    max_validate_frames_per_directory = nil,
-    learningRate = 0.01,
-    learningRateDecay = 0.0001,
+    minibatch_size = 16,
+    epochs = 72,
+    max_frames_per_directory = 10,
+    max_validate_frames_per_directory = 2,
+    learningRate = 0.1,
+    learningRateDecay = 0.00001,
     weightDecay = 0.0005,
-    momentum = 0.001,
+    momentum = 0.01,
     --dampening = 0,
     --nesterov = false,
     log_level = 7,
@@ -40,14 +40,10 @@ local criterion = nn.ClassNLLCriterion():cuda()
 local network = {}
 
 if arg[1] == "train" then
-    network = alexnet(params):cuda()
+    network = colorspace(params):cuda()
     --network = vgg_105_88(params):cuda()
     --network = vgg_mnist(params):cuda()
 
-    i = torch.CudaTensor(10, 3, 176, 211)
-    res = network:forward(i)
-    print(res:size())
-    print(criterion:forward(res, torch.CudaTensor(10):zero() + 1))
     neural_network = train(network, criterion, params, train_frame_dir, validate_frame_dir)
 end
 

@@ -1,4 +1,5 @@
 local json = require 'cjson'
+require 'helpers'
 
 function get_frame_size(frame_dir, params)
     for film_dir in lfs.dir(frame_dir) do    
@@ -7,7 +8,8 @@ function get_frame_size(frame_dir, params)
             for frame_file in lfs.dir(frame_dir .. "/" .. film_dir) do
                 if (string.ends(frame_file, ".png")) then
                     local image_file_name = frame_dir .. film_dir .. "/" .. frame_file
-                    return image.load(image_file_name, params.channels, 'double'):size()
+                    local img = image.load(image_file_name, params.channels, 'double')
+		    return get_color_distribution(img):size()
                 end
             end
         end
@@ -100,9 +102,6 @@ function build_frame_set(frame_dir, max_frames_per_directory, number_of_bins)
                     frames_count = frames_count + 1
                     if frames_count >= from_frame and frames_count <= to_frame then 
                         index = index + 1
-                        if index % 1000 == 0 then
-                            update_output("loading frame: " .. index)
-                        end
                         frame_files[index] = frame_dir .. film_dir .. "/" .. frame_file
                         frame_films[index] = film
                     end

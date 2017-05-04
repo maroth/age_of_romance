@@ -54,10 +54,11 @@ function test_set(neural_network, criterion, params, test_frame_dir, validate_fr
 
         local frame_count = 0
         for frame_index, frame_dir in pairs(film.frames) do
-            status, err = pcall(function()
+
                 local frame = image.load(frame_dir, params.channels, 'double')
-                local minibatch = torch.DoubleTensor(1, frame:size(1), frame:size(2), frame:size(3))
-                minibatch[1] = frame
+		local color_distribution = get_color_distribution(frame)
+                local minibatch = torch.DoubleTensor(1, color_distribution:size(1), color_distribution:size(2))
+                minibatch[1] = color_distribution
                 if (params.use_cuda) then
                     minibatch = minibatch:cuda()
                 end
@@ -72,7 +73,7 @@ function test_set(neural_network, criterion, params, test_frame_dir, validate_fr
                     values, indexes = prediction:topk(i, true, true)
                     --print("topk ", i, values, indexes)
                     for j = 1, i do
-                        if film.bin == indexes[1][j] then
+                        if film.bin == indexes[j] then
                             correct_predictions[i] = correct_predictions[i] + 1
                             if best_prediction > i then
                                 best_prediction = i
@@ -85,12 +86,6 @@ function test_set(neural_network, criterion, params, test_frame_dir, validate_fr
 
                 frame_count = frame_count + 1
                 total_predictions = total_predictions + 1
-
-            end) 
-            if not status then
-                log(9, "ERROR: could not load frame " .. frame_index .. " from directory " .. frame_dir .. " -- " .. err)
-            end
-
         end
 
         fraction_done = film_index / #films

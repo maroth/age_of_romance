@@ -73,6 +73,17 @@ function median(list)
     end
 end
 
+function get_color_distribution(img)
+    require 'image'
+    old_size = img:size()
+    new_size = torch.LongStorage{3, img:size(2) * img:size(3)}
+    linear_image = torch.reshape(img, new_size)
+    sorted_image = torch.sort(linear_image, 2)
+    sorted_image = torch.reshape(sorted_image, old_size)
+    cropped_image = image.crop(sorted_image, "c", 1, old_size[2])
+    return cropped_image:squeeze()
+end
+
 function load_minibatch(params, frame_size, minibatch, shuffled_data)
     --log(3, "Load thread: starting loading for minibatch " .. minibatch.index)
 
@@ -81,7 +92,7 @@ function load_minibatch(params, frame_size, minibatch, shuffled_data)
         --log(1, "trying to load image to memory: " .. shuffled_data.files[abs_index])
         local frame = image.load(shuffled_data.files[abs_index], params.channels, 'double')
         local film = shuffled_data.films[abs_index]
-        minibatch.frames[intra_minibatch_index] = frame
+	minibatch.color_distributions[intra_minibatch_index] = get_color_distribution(frame)
         minibatch.bins[intra_minibatch_index] = film.bin
         --log(1, "loaded frame with normalized date " .. film.normalized_date[1])
     end

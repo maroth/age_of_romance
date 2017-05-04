@@ -22,16 +22,17 @@ function train(neural_network, criterion, params, train_frame_dir, validate_fram
     set_log_level(params.log_level)
 
     local frame_size = get_frame_size(train_frame_dir, params)
+
     local frame_files, frame_films = build_frame_set(train_frame_dir, params.max_frames_per_directory, params.number_of_bins)
     current_minibatch, next_minibatch = create_minibatch_storage(params.minibatch_size, frame_size, params.number_of_bins)
 
     sanity_check(neural_network, criterion, frame_size, params)
     local validate_files, validate_films = build_frame_set(validate_frame_dir, params.max_validate_frames_per_directory, params.number_of_bins)
 
-    current_minibatch.frames = current_minibatch.frames:cuda()
+    current_minibatch.color_distributions = current_minibatch.color_distributions:cuda()
 
     log(10, "Starting training on data in directory " .. train_frame_dir)
-    log(7, "Frame size: " ..  frame_size[1] .. " x " .. frame_size[2] .. " x " .. frame_size[3])
+    --log(7, "Frame size: " ..  frame_size[1] .. " x " .. frame_size[2] .. " x " .. frame_size[3])
     log(10, "Number of training frames: " ..  #frame_files)
     log(10, "Number of validation frames: " ..  #validate_files)
 
@@ -45,6 +46,7 @@ function train(neural_network, criterion, params, train_frame_dir, validate_fram
     local starting_time = os.time()
     local number_of_train_minibatches = get_number_of_minibatches(#frame_files, params.minibatch_size)
     local number_of_validate_minibatches = get_number_of_minibatches(#validate_files, params.minibatch_size)
+    epoch_index = 1
     for epoch_index = 1, params.epochs do
         current_minibatch.index = 1
         next_minibatch.index = 2
@@ -90,7 +92,7 @@ function train_epoch(neural_network, criterion, params, frame_files, frame_films
 
         pool:synchronize()
 
-        current_minibatch.frames = torch.CudaTensor(next_minibatch.frames:size()):copy(next_minibatch.frames:cuda())
+        current_minibatch.color_distributions = torch.CudaTensor(next_minibatch.color_distributions:size()):copy(next_minibatch.color_distributions:cuda())
         current_minibatch.bins = torch.LongTensor(next_minibatch.bins):copy(next_minibatch.bins)
 
         current_minibatch.index = next_minibatch.index 
@@ -123,7 +125,7 @@ function validate(neural_network, criterion, params, validate_files, validate_fi
 
         pool:synchronize()
 
-        current_minibatch.frames = torch.CudaTensor(next_minibatch.frames:size()):copy(next_minibatch.frames:cuda())
+        current_minibatch.color_distributions = torch.CudaTensor(next_minibatch.color_distributions:size()):copy(next_minibatch.color_distributions:cuda())
         current_minibatch.bins = torch.LongTensor(next_minibatch.bins):copy(next_minibatch.bins)
 
         current_minibatch.index = next_minibatch.index 
@@ -148,7 +150,7 @@ function train_minibatch(neural_network, criterion, params, minibatch, epoch_ind
         weight_gradients:zero()
 
         -- forward the minibatch through the network, getting the prediction
-        local prediction = neural_network:forward(minibatch.frames)
+        local prediction = neural_network:forward(minibatch.color_distributions)
         if (prediction:size(1) > 1) then
             local_prediction = prediction[1][1]
         else
@@ -164,11 +166,12 @@ function train_minibatch(neural_network, criterion, params, minibatch, epoch_ind
         -- calculate the gradient error by feeding the prediction 
         -- and the ground truth backwards through the criterion
         -- local grad_criterion = criterion:backward(prediction, minibatch.dates)
+        -- local grad_criterion = criterion:backward(prediction, minibatch.bins)
         local grad_criterion = criterion:backward(prediction, minibatch.bins)
         --log(2, "Backwarded prediction for minibatch " .. minibatch.index .. " into criterion, mean grad_criterion is " .. grad_criterion:mean())
 
         -- feed the gradients backward through the network
-        neural_network:backward(minibatch.frames, grad_criterion)
+        neural_network:backward(minibatch.color_distributions, grad_criterion)
 
         log(7, minibatch_summary(minibatch.index, number_of_minibatches, epoch_index, params.epochs, starting_time, err))
         
@@ -181,7 +184,7 @@ function train_minibatch(neural_network, criterion, params, minibatch, epoch_ind
 end
 
 function validate_minibatch(neural_network, criterion, params, minibatch)
-    local prediction = neural_network:forward(minibatch.frames)
+    local prediction = neural_network:forward(minibatch.color_distributions)
     if (prediction:size(1) > 1) then
         local_prediction = prediction[1][1]
     else
@@ -216,14 +219,14 @@ end
 
 function create_minibatch_storage(minibatch_size, frame_size, number_of_bins)
     local current_minibatch = {
-        frames = torch.DoubleTensor(minibatch_size, frame_size[1], frame_size[2], frame_size[3]),
+        color_distributions = torch.DoubleTensor(minibatch_size, 3, frame_size[2]),
         bins = torch.LongTensor(minibatch_size),
         index = 1
     }
 
     local next_minibatch = {
-        frames = torch.DoubleTensor(minibatch_size, frame_size[1], frame_size[2], frame_size[3]),
         bins = torch.LongTensor(minibatch_size),
+        color_distributions = torch.DoubleTensor(minibatch_size, 3, frame_size[2]),
         index = 2
     }
     return current_minibatch, next_minibatch

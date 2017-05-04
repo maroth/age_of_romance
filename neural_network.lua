@@ -1,6 +1,26 @@
 require 'nn'
 require 'cunn'
 
+function colorspace(params)
+   local net = nn.Sequential()
+   net:add(nn.View(3*176):setNumInputDims(3))
+
+   net:add(nn.Linear(3*176, 1024))
+   --net:add(nn.BatchNormalization(1024))
+   --net:add(nn.ReLU(true))
+   --net:add(nn.Dropout(0.5))
+
+   --net:add(nn.Linear(1024, 1024))
+   --net:add(nn.BatchNormalization(1024))
+   --net:add(nn.ReLU(true))
+   --net:add(nn.Dropout(0.5))
+
+   net:add(nn.Linear(1024, params.number_of_bins))
+   net:add(nn.LogSoftMax())
+
+   return net
+end
+
 function vgg_105_88_tiny(params)
     local vgg = nn.Sequential()
 
@@ -134,15 +154,19 @@ function alexnet(params)
     features:add(SpatialConvolution(256,256,3,3,1,1,1,1)) 
     features:add(nn.ReLU(true))
     features:add(SpatialMaxPooling(3,3,2,2))              
+    features:add(SpatialConvolution(256,256,5,4,1,1,0, 0)) 
 
-    features:add(nn.View(256*4*5):setNumInputDims(3))
+    features:add(nn.View(256):setNumInputDims(3))
     features:add(nn.Dropout(0.5))
-    features:add(nn.Linear(256*4*5, 4096))
+    features:add(nn.Linear(256, 4096))
     features:add(nn.Threshold(0, 1e-6))
     features:add(nn.Dropout(0.5))
     features:add(nn.Linear(4096, 4096))
     features:add(nn.Threshold(0, 1e-6))
-    features:add(nn.Linear(4096, 50))
+    features:add(nn.Dropout(0.5))
+    features:add(nn.Linear(4096, 4096))
+    features:add(nn.Threshold(0, 1e-6))
+    features:add(nn.Linear(4096, params.number_of_bins))
     features:add(nn.LogSoftMax())
 
     print(features)
