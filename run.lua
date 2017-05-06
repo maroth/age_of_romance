@@ -4,13 +4,13 @@ require 'neural_network'
 require 'nn'
 pcall(require, "cunn")
 
-validate_frame_dir = "frames_105x88_distributed/validate/"
-train_frame_dir = "frames_105x88_distributed/train/"
-test_frame_dir = "frames_105x88_distributed/test/"
+--validate_frame_dir = "frames_105x88_distributed/validate/"
+--train_frame_dir = "frames_105x88_distributed/train/"
+--test_frame_dir = "frames_105x88_distributed/test/"
 
-validate_frame_dir = "frames_211x176_distributed/validate/"
-train_frame_dir = "frames_211x176_distributed/train/"
-test_frame_dir = "frames_211x176_distributed/test/"
+validate_frame_dir = "frames_211x176_distributed_tiny/validate/"
+train_frame_dir = "frames_211x176_distributed_tiny/train/"
+test_frame_dir = "frames_211x176_distributed_tiny/test/"
 
 --train_frame_dir = "./mnist/training/"
 --test_frame_dir  = "./mnist/training/"
@@ -22,13 +22,13 @@ local params = {
     channels = 3,
     model_filename = 'colorspace',
     save_frequency = 5,
-    number_of_bins = 50,
-    minibatch_size = 16,
-    epochs = 72,
-    max_frames_per_directory = 10,
-    max_validate_frames_per_directory = 2,
-    learningRate = 0.1,
-    learningRateDecay = 0.00001,
+    number_of_bins = 6,
+    minibatch_size = 32,
+    epochs = 1024,
+    max_frames_per_directory = nil,
+    max_validate_frames_per_directory = nil,
+    learningRate = 0.01,
+    learningRateDecay = 0.0001,
     weightDecay = 0.0005,
     momentum = 0.01,
     --dampening = 0,

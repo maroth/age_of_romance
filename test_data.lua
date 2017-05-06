@@ -57,8 +57,9 @@ function test_set(neural_network, criterion, params, test_frame_dir, validate_fr
 
                 local frame = image.load(frame_dir, params.channels, 'double')
 		local color_distribution = get_color_distribution(frame)
-                local minibatch = torch.DoubleTensor(1, color_distribution:size(1), color_distribution:size(2))
+                local minibatch = torch.DoubleTensor(2, color_distribution:size(1), color_distribution:size(2))
                 minibatch[1] = color_distribution
+                minibatch[2] = color_distribution
                 if (params.use_cuda) then
                     minibatch = minibatch:cuda()
                 end
@@ -73,7 +74,7 @@ function test_set(neural_network, criterion, params, test_frame_dir, validate_fr
                     values, indexes = prediction:topk(i, true, true)
                     --print("topk ", i, values, indexes)
                     for j = 1, i do
-                        if film.bin == indexes[j] then
+                        if film.bin == indexes[1][j] then
                             correct_predictions[i] = correct_predictions[i] + 1
                             if best_prediction > i then
                                 best_prediction = i

@@ -5,17 +5,32 @@ function colorspace(params)
    local net = nn.Sequential()
    net:add(nn.View(3*176):setNumInputDims(3))
 
-   net:add(nn.Linear(3*176, 1024))
-   --net:add(nn.BatchNormalization(1024))
-   --net:add(nn.ReLU(true))
-   --net:add(nn.Dropout(0.5))
+   net:add(nn.Linear(3*176, 4096))
+   net:add(nn.BatchNormalization(4096))
+   net:add(nn.ReLU(true))
+   net:add(nn.Dropout(0.5))
 
-   --net:add(nn.Linear(1024, 1024))
-   --net:add(nn.BatchNormalization(1024))
-   --net:add(nn.ReLU(true))
-   --net:add(nn.Dropout(0.5))
+   net:add(nn.Linear(4096, 4096))
+   net:add(nn.BatchNormalization(4096))
+   net:add(nn.ReLU(true))
+   net:add(nn.Dropout(0.5))
 
-   net:add(nn.Linear(1024, params.number_of_bins))
+   net:add(nn.Linear(4096, 4096))
+   net:add(nn.BatchNormalization(4096))
+   net:add(nn.ReLU(true))
+   net:add(nn.Dropout(0.5))
+
+   net:add(nn.Linear(4096, 4096))
+   net:add(nn.BatchNormalization(4096))
+   net:add(nn.ReLU(true))
+   net:add(nn.Dropout(0.5))
+
+   net:add(nn.Linear(4096, 4096))
+   net:add(nn.BatchNormalization(4096))
+   net:add(nn.ReLU(true))
+   net:add(nn.Dropout(0.5))
+
+   net:add(nn.Linear(4096, params.number_of_bins))
    net:add(nn.LogSoftMax())
 
    return net
