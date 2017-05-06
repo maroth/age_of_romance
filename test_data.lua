@@ -6,10 +6,11 @@ require 'load_logic'
 require 'helpers'
 require 'optim'
 
-function test(neural_network, criterion, params, test_frame_dir, validate_frame_dir, train_frame_dir) 
-    local test_predictions, test_count = test_set(neural_network, criterion, params, test_frame_dir)
-    local validate_predictions, validate_count = test_set(neural_network, criterion, params, validate_frame_dir)
-    local train_predictions, train_count  = test_set(neural_network, criterion, params, train_frame_dir)
+function test(neural_network, criterion, params, train_d, train_l, val_d, val_l, test_d, test_l)
+    print(train_d, train_l)
+    local test_predictions, test_count = test_set(neural_network, criterion, params, test_d, test_l)
+    local validate_predictions, validate_count = test_set(neural_network, criterion, params, val_d, val_l)
+    local train_predictions, train_count  = test_set(neural_network, criterion, params, train_d, train_l)
 
     logger = optim.Logger("test.log")
     logger:setNames{'Test', 'Validate', 'Train'}
@@ -27,17 +28,11 @@ function test(neural_network, criterion, params, test_frame_dir, validate_frame_
     logger:plot()
 end
 
-function test_set(neural_network, criterion, params, test_frame_dir, validate_frame_dir, train_frame_dir) 
-    set_log_level(params.log_level)
-    log(3, "\n\nTesting data with files from " .. test_frame_dir)
-    local films = load_films(test_frame_dir, params.max_frames_per_directory, params.number_of_bins)
-    log(3, "Number of test films: " ..  #films)
+function test_set(neural_network, criterion, params, data_file, labels_file) 
 
-    local sorted_films = {}
-    for _, film in pairs(films) do
-        table.insert(sorted_films, film)
-    end
-    table.sort(sorted_films, function(a, b) return a.normalized_date[1] < b.normalized_date[1] end)
+    local data  = torch.load(data_file)
+    local labels = torch.load(labels_file)
+    set_log_level(params.log_level)
 
     local correct_predictions = {}
     for i = 1, params.number_of_bins do
@@ -49,49 +44,29 @@ function test_set(neural_network, criterion, params, test_frame_dir, validate_fr
     local starting_time = os.time()
     local fraction_done = 0
 
-    for film_index, film in ipairs(sorted_films) do
-        log(8, "testing on film " .. film.title)
+    for frame_index = 1, labels:size(1), 100 do
 
-        local frame_count = 0
-        for frame_index, frame_dir in pairs(film.frames) do
+        local prediction = neural_network:forward(data[frame_index])
+       
+        v, i = prediction:topk(1, true, true)
+        --print(i[1], v[1], get_bin(labels[frame_index], params.number_of_bins))
 
-                local frame = image.load(frame_dir, params.channels, 'double')
-		local color_distribution = get_color_distribution(frame)
-                local minibatch = torch.DoubleTensor(2, color_distribution:size(1), color_distribution:size(2))
-                minibatch[1] = color_distribution
-                minibatch[2] = color_distribution
-                if (params.use_cuda) then
-                    minibatch = minibatch:cuda()
+        for bin_index = 1, params.number_of_bins do
+            values, indexes = prediction:topk(bin_index, true, true)
+
+            for j = 1, bin_index do
+                if get_bin(labels[frame_index], params.number_of_bins) == indexes[j] then
+                    correct_predictions[bin_index] = correct_predictions[bin_index] + 1
                 end
-                log(1, "feeding frame " .. frame_dir .. " to test network")
-
-                local prediction = neural_network:forward(minibatch)
-                --print("\n\n\nbin", film.bin)
-                --print(prediction)
-
-                local best_prediction = params.number_of_bins
-                for i = 1, params.number_of_bins do
-                    values, indexes = prediction:topk(i, true, true)
-                    --print("topk ", i, values, indexes)
-                    for j = 1, i do
-                        if film.bin == indexes[1][j] then
-                            correct_predictions[i] = correct_predictions[i] + 1
-                            if best_prediction > i then
-                                best_prediction = i
-                            end
-                        end
-                    end
-                end
-
-                log(3, "correct bin in top " .. best_prediction .. " probabilities")
-
-                frame_count = frame_count + 1
-                total_predictions = total_predictions + 1
+            end
         end
 
-        fraction_done = film_index / #films
-        local remaining_time = get_remaining_time(starting_time, fraction_done)
-        log(7, "remaining time: " .. remaining_time)
+
+        total_predictions = total_predictions + 1
+
+        fraction_done = frame_index / labels:size(1)
+        
+        print(fraction_done)
     end
 
     return correct_predictions, total_predictions
