@@ -44,7 +44,7 @@ function test_set(neural_network, criterion, params, data_file, labels_file)
     local starting_time = os.time()
     local fraction_done = 0
 
-    for frame_index = 1, labels:size(1), 100 do
+    for frame_index = 1, labels:size(1), 10 do
 
         local prediction = neural_network:forward(data[frame_index])
        
