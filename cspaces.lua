@@ -69,7 +69,7 @@ function train_epoch(neural_network, criterion, params, train_frame_cspaces, tra
 
         function feval(new_weights)
         
-            local bins = bins_shuffled:sub(i, math.min(i + minibatch_size - 1, train_frame_cspaces:size(1))):apply(function(x) return get_bin(x, params.number_of_bins) end)
+            local bins = bins_shuffled:sub(i, math.min(i + minibatch_size - 1, train_frame_cspaces:size(1)))
             local cspaces = cspaces_shuffled:sub(i, math.min(i + minibatch_size - 1, train_frame_cspaces:size(1)))
             
             if new_weights ~= weights then
@@ -97,7 +97,7 @@ function validate(neural_network, criterion, params, validate_frame_cspaces, val
     local err_sum = 0
     for i = 1, validate_frame_bins:size(1) do
         local prediction = neural_network:forward(validate_frame_cspaces[i])
-        local err = criterion:forward(prediction, get_bin(validate_frame_bins[i], params.number_of_bins))
+        local err = criterion:forward(prediction, validate_frame_bins[i])
         err_sum = err_sum + err
     end
     return err_sum / validate_frame_bins:size(1)

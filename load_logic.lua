@@ -54,7 +54,8 @@ end
 
 function load_films(frame_dir, max_frames_per_directory, number_of_bins)
     films = {}
-    for film_dir in lfs.dir(frame_dir) do    
+    local film_id = 1
+    for _, film_dir in ipairs(get_sorted_film_dirs(frame_dir)) do  
         local info_file_path = frame_dir .. film_dir .. "/info.json"
         if file_exists(info_file_path) then
             local film  = parse_info_file(info_file_path)
@@ -65,6 +66,8 @@ function load_films(frame_dir, max_frames_per_directory, number_of_bins)
             film.normalized_date = normalize_date(parse_date(film.date))
             film.bin_vector = create_probability_vector(film.normalized_date[1], number_of_bins)
             film.bin = get_bin(film.normalized_date[1], number_of_bins)
+            film.id = film_id
+            film_id = film_id + 1
             film.frames = {}
             local frames_count = 0
             for frame_file in lfs.dir(frame_dir .. film_dir) do
@@ -103,7 +106,7 @@ function save_cspaces(file_cspaces, file_films, frame_dir, number_of_bins)
     local frame_films, frame_cspaces = build_frame_set(frame_dir, nil, number_of_bins)
     local frame_films_tensor = torch.CudaTensor(#frame_films)
     for i = 1, #frame_films do
-        frame_films_tensor[i] = frame_films[i].normalized_date
+        frame_films_tensor[i] = frame_films[i].id
     end
     local frame_cspaces_tensor = torch.CudaTensor(#frame_cspaces, 3, 176)
     for i = 1, #frame_cspaces do
@@ -118,7 +121,8 @@ function build_frame_set(frame_dir, max_frames_per_directory, number_of_bins)
     frame_files = {}
     frame_films = {}
     frame_cspaces = {}
-    for film_dir in lfs.dir(frame_dir) do    
+    local film_id = 1
+    for _, film_dir in ipairs(get_sorted_film_dirs(frame_dir)) do
         local info_file_path = frame_dir .. "/" .. film_dir .. "/info.json"
         if file_exists(info_file_path) then
             local film  = parse_info_file(info_file_path)
@@ -127,7 +131,8 @@ function build_frame_set(frame_dir, max_frames_per_directory, number_of_bins)
             local from_frame, to_frame = frame_limits(total_frames, max_frames_per_directory)
 
             film.normalized_date = normalize_date(parse_date(film.date))
-            
+            film.id = film_id
+            film_id = film_id + 1
 
             local frames_count = 0
             for frame_file in lfs.dir(frame_dir .. "/" .. film_dir) do
@@ -147,6 +152,15 @@ function build_frame_set(frame_dir, max_frames_per_directory, number_of_bins)
         end
     end
     return frame_films, frame_cspaces
+end
+
+function get_sorted_film_dirs(frame_dir)
+    local film_dirs = {}
+    for film_dir in lfs.dir(frame_dir) do
+        table.insert(film_dirs, film_dir)
+    end
+    table.sort(film_dirs)
+    return film_dirs
 end
 
 
