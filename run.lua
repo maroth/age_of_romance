@@ -11,6 +11,7 @@ local params = {
     epochs = 1000,
     learningRate = 0.01,
     number_of_bins = 250,
+    minibatch_size = 1024,
     --learningRateDecay = 0.0001,
     --weightDecay = 0.00001,
     momentum = 0.01,

@@ -49,13 +49,13 @@ function train(neural_network, criterion, params, train_file_cspaces, train_file
         end
         
         logger:add{train_err, validate_err}
-        log(9, epoch_summary(epoch_index, params.epochs, train_err, validate_err, 64, starting_time))
+        log(9, epoch_summary(epoch_index, params.epochs, train_err, validate_err, params.minibatch_size, starting_time))
         logger:plot()
         
         if last_validate_err == nil then
             last_validate_err = validate_err
         elseif last_validate_err < validate_err then
-            break
+            -- break
         end
         
         last_validate_err = validate_err
@@ -74,14 +74,12 @@ function train_epoch(neural_network, criterion, params, train_frame_cspaces, tra
      
     local total_frames = bins_shuffled:size(1) * params.epochs
 
-    local minibatch_size = 64
-
-    for i = 1, train_frame_cspaces:size(1), minibatch_size do
+    for i = 1, train_frame_cspaces:size(1), params.minibatch_size do
 
         function feval(new_weights)
         
-            local bins = bins_shuffled:sub(i, math.min(i + minibatch_size - 1, train_frame_cspaces:size(1)))
-            local cspaces = cspaces_shuffled:sub(i, math.min(i + minibatch_size - 1, train_frame_cspaces:size(1)))
+            local bins = bins_shuffled:sub(i, math.min(i + params.minibatch_size - 1, train_frame_cspaces:size(1)))
+            local cspaces = cspaces_shuffled:sub(i, math.min(i + params.minibatch_size - 1, train_frame_cspaces:size(1)))
             
             if new_weights ~= weights then
                 weights:copy(new_weights)
@@ -100,7 +98,7 @@ function train_epoch(neural_network, criterion, params, train_frame_cspaces, tra
         err_sum = err_sum + err[1]         
     end    
 
-    return err_sum / (train_frame_cspaces:size(1) / minibatch_size)
+    return err_sum / (train_frame_cspaces:size(1) / params.minibatch_size)
 
 end
 

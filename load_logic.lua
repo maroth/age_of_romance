@@ -89,34 +89,43 @@ end
 
 function all_cspaces()
     number_of_bins = 250
-    save_cspaces("cspaces/distributed_test_data_" .. number_of_bins .. ".bin", "cspaces/test_labels_" .. number_of_bins .. ".bin", "frames_211x176_distributed/test/", number_of_bins)
-    save_cspaces("cspaces/distributed_train_data_" .. number_of_bins .. ".bin", "cspaces/train_labels_" .. number_of_bins .. ".bin", "frames_211x176_distributed/train/", number_of_bins)
-    save_cspaces("cspaces/distributed_validate_data_" .. number_of_bins .. ".bin", "cspaces/validate_labels_" .. number_of_bins .. ".bin", "frames_211x176_distributed/validate/", number_of_bins)
+    save_cspaces("distributed_test", "frames_211x176_distributed/test/")
+    save_cspaces("distributed_train", "frames_211x176_distributed/train/")
+    save_cspaces("distributed_validate", "frames_211x176_distributed/validate/")
     
-    save_cspaces("cspaces/continuous_test_data_" .. number_of_bins .. ".bin", "cspaces/continuous_test_labels_" .. number_of_bins .. ".bin", "frames_211x176_continuous/test/", number_of_bins)
-    save_cspaces("cspaces/continuous_train_data_" .. number_of_bins .. ".bin", "cspaces/continuous_train_labels_" .. number_of_bins .. ".bin", "frames_211x176_continuous/train/", number_of_bins)
-    save_cspaces("cspaces/continuous_validate_data_" .. number_of_bins .. ".bin", "cspaces/continuous_validate_labels_" .. number_of_bins .. ".bin", "frames_211x176_continuous/validate/", number_of_bins)
+    save_cspaces("continuous_test", "frames_211x176_continuous/test/")
+    save_cspaces("continuous_train", "frames_211x176_continuous/train/")
+    save_cspaces("continuous_validate", "frames_211x176_continuous/validate/")
     
-    save_cspaces("cspaces/separate_test_data_" .. number_of_bins .. ".bin", "cspaces/separate_test_labels_" .. number_of_bins .. ".bin", "frames_211x176_separate/test/", number_of_bins)
-    save_cspaces("cspaces/separate_train_data_" .. number_of_bins .. ".bin", "cspaces/separate_train_labels_" .. number_of_bins .. ".bin", "frames_211x176_separate/train/", number_of_bins)
-    save_cspaces("cspaces/separate_validate_data_" .. number_of_bins .. ".bin", "cspaces/separate_validate_labels_" .. number_of_bins .. ".bin", "frames_211x176_separate/validate/", number_of_bins)
+    save_cspaces("separate_test", "frames_211x176_separate/test/")
+    save_cspaces("separate_train", "frames_211x176_separate/train/")
+    save_cspaces("separate_validate", "frames_211x176_separate/validate/")
 end
 
-function save_cspaces(file_cspaces, file_films, frame_dir, number_of_bins)
+function save_cspaces(name, frame_dir, number_of_bins)
     local frame_films, frame_cspaces = build_frame_set(frame_dir, nil, number_of_bins)
+
     local frame_films_tensor = torch.CudaTensor(#frame_films)
     for i = 1, #frame_films do
         frame_films_tensor[i] = frame_films[i].id
     end
+
+    local normalized_dates_tensor = torch.CudaTensor(#frame_films)
+    for i = 1, #frame_films do
+        normalized_dates_tensor[i] = frame_films[i].normalized_date
+    end
+
     local frame_cspaces_tensor = torch.CudaTensor(#frame_cspaces, 3, 176)
     for i = 1, #frame_cspaces do
         frame_cspaces_tensor[i] = frame_cspaces[i]
     end
-    torch.save(file_films, frame_films_tensor)
-    torch.save(file_cspaces, frame_cspaces_tensor)
+
+    torch.save("cspaces/" .. name .. "_normalized_dates.bin", normalized_dates_tensor)
+    torch.save("cspaces/" .. name .. "_ids.bin", frame_films_tensor)
+    torch.save("cspaces/" .. name .. "_data.bin", frame_cspaces_tensor)
 end
 
-function build_frame_set(frame_dir, max_frames_per_directory, number_of_bins)
+function build_frame_set(frame_dir, max_frames_per_directory)
     local index = 0
     frame_files = {}
     frame_films = {}
