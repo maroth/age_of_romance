@@ -72,10 +72,12 @@ def create_continuous():
             for x in range(1, 81, 1):
                 copy_command = "cp " + frame_dir + "/" + subdir + "/" + str(x) + ".png " + "train/" + subdir
                 os.system(copy_command)
+
             for x in range(161, 241, 1):
                 copy_command = "cp " + frame_dir + "/" + subdir + "/" + str(x) + ".png " + "train/" + subdir
                 os.system(copy_command)
-            for x in range(321, 401, 5):
+
+            for x in range(321, 401, 1):
                 copy_command = "cp " + frame_dir + "/" + subdir + "/" + str(x) + ".png " + "train/" + subdir
                 os.system(copy_command)
 
@@ -105,6 +107,6 @@ def create_seperate():
 
 
 #create_distributed()
-#create_continuous()
+create_continuous()
 #create_seperate()
         
