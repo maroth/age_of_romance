@@ -89,9 +89,9 @@ end
 
 function all_cspaces()
     number_of_bins = 250
-    save_cspaces("cspaces/test_data_" .. number_of_bins .. ".bin", "cspaces/test_labels_" .. number_of_bins .. ".bin", "frames_211x176_distributed/test/", number_of_bins)
-    save_cspaces("cspaces/train_data_" .. number_of_bins .. ".bin", "cspaces/train_labels_" .. number_of_bins .. ".bin", "frames_211x176_distributed/train/", number_of_bins)
-    save_cspaces("cspaces/validate_data_" .. number_of_bins .. ".bin", "cspaces/validate_labels_" .. number_of_bins .. ".bin", "frames_211x176_distributed/validate/", number_of_bins)
+    save_cspaces("cspaces/distributed_test_data_" .. number_of_bins .. ".bin", "cspaces/test_labels_" .. number_of_bins .. ".bin", "frames_211x176_distributed/test/", number_of_bins)
+    save_cspaces("cspaces/distributed_train_data_" .. number_of_bins .. ".bin", "cspaces/train_labels_" .. number_of_bins .. ".bin", "frames_211x176_distributed/train/", number_of_bins)
+    save_cspaces("cspaces/distributed_validate_data_" .. number_of_bins .. ".bin", "cspaces/validate_labels_" .. number_of_bins .. ".bin", "frames_211x176_distributed/validate/", number_of_bins)
     
     save_cspaces("cspaces/continuous_test_data_" .. number_of_bins .. ".bin", "cspaces/continuous_test_labels_" .. number_of_bins .. ".bin", "frames_211x176_continuous/test/", number_of_bins)
     save_cspaces("cspaces/continuous_train_data_" .. number_of_bins .. ".bin", "cspaces/continuous_train_labels_" .. number_of_bins .. ".bin", "frames_211x176_continuous/train/", number_of_bins)

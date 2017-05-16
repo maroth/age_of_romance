@@ -28,7 +28,7 @@ function train(neural_network, criterion, params, train_file_cspaces, train_file
     log(10, "Number of training frames: " ..  train_frame_cspaces:size(1))
     log(10, "Number of validation frames: " ..  validate_frame_cspaces:size(1))
 
-    local logger = optim.Logger('training_error.log')
+    local logger = optim.Logger(params.name .. "-" .. 'training-error.log')
     logger:setlogscale()
     logger:setNames{'Training error', 'Validation error'}
     logger:style{'+-', '+-'}
@@ -36,22 +36,33 @@ function train(neural_network, criterion, params, train_file_cspaces, train_file
 
     local starting_time = os.time()
 
-    epoch_index = 1
-    last_validate_err = 0
+    local epoch_index = 1
+    local last_validate_err = nil
+    local validate_err = 0
     for epoch_index = 1, params.epochs do
 
         local train_err = train_epoch(neural_network, criterion, params, train_frame_cspaces, train_frame_bins, frame_size, pool, starting_time, epoch_index, number_of_train_minibatches)
 
         if epoch_index % params.save_frequency == 0 or epoch_index == 1 then
-            torch.save("models/" .. params.model_filename .. epoch_index .. ".model", neural_network)
-            last_validate_err = validate(neural_network, criterion, params, validate_frame_cspaces, validate_frame_bins, frame_size, pool, number_of_validate_minibatches)
+            torch.save("models/" .. params.name .. "_" .. epoch_index .. ".model", neural_network)
+            validate_err = validate(neural_network, criterion, params, validate_frame_cspaces, validate_frame_bins, frame_size, pool, number_of_validate_minibatches)
         end
-        logger:add{train_err, last_validate_err}
-        log(9, epoch_summary(epoch_index, params.epochs, train_err, last_validate_err, starting_time))
+        
+        logger:add{train_err, validate_err}
+        log(9, epoch_summary(epoch_index, params.epochs, train_err, validate_err, 64, starting_time))
         logger:plot()
+        
+        if last_validate_err == nil then
+            last_validate_err = validate_err
+        elseif last_validate_err < validate_err then
+            break
+        end
+        
+        last_validate_err = validate_err
+
     end
 
-    torch.save("models/" .. params.model_filename .. epoch_index .. ".model", neural_network)
+    torch.save("models/" .. params.name .. "_" .. epoch_index .. ".model", neural_network)
     return neural_network
 end
 
