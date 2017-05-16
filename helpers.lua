@@ -89,3 +89,14 @@ function load_minibatch(params, frame_size, minibatch, shuffled_data)
     --log(3, "Load thread: loading complete for minibatch " .. minibatch.index)
 end
 
+function get_color_distribution(img)
+    require 'image'
+    old_size = img:size()
+    new_size = torch.LongStorage{3, img:size(2) * img:size(3)}
+    linear_image = torch.reshape(img, new_size)
+    sorted_image = torch.sort(linear_image, 2)
+    sorted_image = torch.reshape(sorted_image, old_size)
+    cropped_image = image.crop(sorted_image, "c", 1, old_size[2])
+    return cropped_image:squeeze()
+end
+

@@ -9,7 +9,7 @@ require 'helpers'
 require 'test_network'
 
 
-function train(neural_network, criterion, params, train_file_cspaces, train_file_bins, validate_file_cspaces, validate_file_bins) 
+function train(neural_network, criterion, params, files)
 
     weights, weight_gradients = neural_network:getParameters()
 
@@ -17,11 +17,11 @@ function train(neural_network, criterion, params, train_file_cspaces, train_file
 
     local frame_size = torch.LongStorage{3, 176}
 
-    local train_frame_cspaces = torch.load(train_file_cspaces)
-    local train_frame_bins = torch.load(train_file_bins)
+    local train_frame_cspaces = torch.load(files.train_file_cspaces)
+    local train_frame_bins = torch.load(files.train_file_ids)
     
-    local validate_frame_cspaces = torch.load(validate_file_cspaces)
-    local validate_frame_bins = torch.load(validate_file_bins)
+    local validate_frame_cspaces = torch.load(files.validate_file_cspaces)
+    local validate_frame_bins = torch.load(files.validate_file_ids)
 
     sanity_check(neural_network, criterion, frame_size, params)
 
