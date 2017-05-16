@@ -89,13 +89,13 @@ end
 
 function all_cspaces()
     number_of_bins = 250
-    save_cspaces("distributed_test", "frames_211x176_distributed/test/")
-    save_cspaces("distributed_train", "frames_211x176_distributed/train/")
-    save_cspaces("distributed_validate", "frames_211x176_distributed/validate/")
+    --save_cspaces("distributed_test", "frames_211x176_distributed/test/")
+    --save_cspaces("distributed_train", "frames_211x176_distributed/train/")
+    --save_cspaces("distributed_validate", "frames_211x176_distributed/validate/")
     
-    save_cspaces("continuous_test", "frames_211x176_continuous/test/")
-    save_cspaces("continuous_train", "frames_211x176_continuous/train/")
-    save_cspaces("continuous_validate", "frames_211x176_continuous/validate/")
+    --save_cspaces("continuous_test", "frames_211x176_continuous/test/")
+    --save_cspaces("continuous_train", "frames_211x176_continuous/train/")
+    --save_cspaces("continuous_validate", "frames_211x176_continuous/validate/")
     
     save_cspaces("separate_test", "frames_211x176_separate/test/")
     save_cspaces("separate_train", "frames_211x176_separate/train/")

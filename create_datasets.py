@@ -81,6 +81,25 @@ def create_continuous():
                 copy_command = "cp " + frame_dir + "/" + subdir + "/" + str(x) + ".png " + "train/" + subdir
                 os.system(copy_command)
 
+def test():
+    os.system("mkdir train")
+    os.system("mkdir test")
+    os.system("mkdir validate")
+    for _, dirs, _ in os.walk(frame_dir):
+        for subdir in dirs:
+            mkdir_command = "mkdir validate/" + subdir
+            os.system(mkdir_command)
+            mkdir_command = "mkdir train/" + subdir
+            os.system(mkdir_command)
+            mkdir_command = "mkdir test/" + subdir
+            os.system(mkdir_command)
+
+            copy_command = "cp " + frame_dir + "/" + subdir + "/info.json " + "validate/" + subdir
+            os.system(copy_command)
+            copy_command = "cp " + frame_dir + "/" + subdir + "/info.json " + "train/" + subdir
+            os.system(copy_command)
+            copy_command = "cp " + frame_dir + "/" + subdir + "/info.json " + "test/" + subdir
+            os.system(copy_command)
 
 
 def create_seperate():
@@ -107,6 +126,7 @@ def create_seperate():
 
 
 #create_distributed()
-create_continuous()
+#create_continuous()
 #create_seperate()
+test()
         

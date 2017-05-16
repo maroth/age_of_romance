@@ -1,20 +1,37 @@
 require 'cspaces'
 require 'test_data'
-require 'neural_network'
 require 'nn'
 require 'load_logic'
 require 'cunn'
 
+function colorspace(params)
+   local net = nn.Sequential()
+   net:add(nn.View(3*176))
+
+   net:add(nn.Linear(3*176, 176))
+   net:add(nn.ReLU(true))
+   net:add(nn.Linear(176, 1024))
+   net:add(nn.ReLU(true))
+   net:add(nn.Linear(1024, 1024))
+   net:add(nn.ReLU(true))
+   net:add(nn.Linear(1024, 128))
+   net:add(nn.ReLU(true))
+   net:add(nn.Linear(128, params.number_of_bins))
+   net:add(nn.LogSoftMax())
+
+   return net
+end
+
 local params = {
     name = 'experiment',
-    save_frequency = 1000,
-    epochs = 1000,
-    learningRate = 0.001,
-    number_of_bins = 250,
+    save_frequency = 10,
+    epochs = 1000000,
+    learningRate = 0.01,
+    number_of_bins = 5,
     minibatch_size = 250,
-    --learningRateDecay = 0.0001,
-    --weightDecay = 0.00001,
-    --momentum = 0.01,
+    learningRateDecay = 0.00001,
+    weightDecay = 0.005,
+    --momentum = 0.1,
     --dampening = 0,
     --nesterov = false,
     log_level = 7,
@@ -47,7 +64,7 @@ local network = {}
 
 if arg[2] == "full" then
     network = colorspace(params):cuda()
-    params.name = arg[3] .. "_" .. arg[1] .. "_"
+    params.name = arg[3] .. "_" .. arg[1]
     neural_network = train(network, criterion, params, files)
     test(network, criterion, params, files)
 end
@@ -61,7 +78,7 @@ if arg[2] == "train" then
         log(10, "model loaded")
     end
     
-    params.name = arg[3] .. "_" .. arg[1] .. "_"
+    params.name = arg[4] 
 
     neural_network = train(network, criterion, params, files)
 end
@@ -70,9 +87,9 @@ if arg[2] == "test" then
     log(10, "loading model from " .. arg[3])
     network = torch.load(arg[3])
     log(10, "model loaded")
-    print(train_file_cspaces)
+    print(files.train_file_cspaces)
     
-    params.name = arg[3] .. "_" .. arg[1] .. "_"
+    params.name = string.gsub(arg[3], "/", "_")  .. "_" .. arg[1]
 
     test(network, criterion, params, files)
 end

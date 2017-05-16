@@ -7,15 +7,17 @@ require 'helpers'
 require 'optim'
 
 function test(neural_network, criterion, params, files)
-    print(train_d, train_l)
-    local test_predictions, test_pm5, test_count = test_set(neural_network, criterion, params, files.test_file_cspaces, files.test_file_ids)
-    local validate_predictions, validate_pm5, validate_count = test_set(neural_network, criterion, params, files.validate_file_cspaces, files.validate_file_ids)
-    local train_predictions, train_pm5, train_count  = test_set(neural_network, criterion, params, files.train_file_cspaces, files.train_file_ids)
+    set_log_level(params.log_level)
+    local test_predictions, test_pm5, test_count = test_set(neural_network, criterion, params, files.test_file_cspaces, files.test_file_ids, files.test_file_normalized_dates)
+    local validate_predictions, validate_pm5, validate_count = test_set(neural_network, criterion, params, files.validate_file_cspaces, files.validate_file_ids, files.validate_file_normalized_dates)
+    local train_predictions, train_pm5, train_count  = test_set(neural_network, criterion, params, files.train_file_cspaces, files.train_file_ids, files.train_file_normalized_dates)
 
-    logger = optim.Logger(params.name .. "-test.log")
+    print("name", params.name)
+    local logger = optim.Logger(params.name .. "_test.log")
+
+    print(logger)
     logger:setNames{'Test', 'Validate', 'Train'}
     logger:style{'+-', '+-', '+-'}
-    logger:display(false)
     for i = 1, params.number_of_bins do
         local test_accuracy = test_predictions[i] / test_count
         local validate_accuracy = validate_predictions[i] / validate_count
@@ -33,11 +35,11 @@ function test(neural_network, criterion, params, files)
     logger:plot()
 end
 
-function test_set(neural_network, criterion, params, data_file, labels_file) 
+function test_set(neural_network, criterion, params, data_file, ids_file, normalized_dates_file) 
 
     local data  = torch.load(data_file)
-    local labels = torch.load(labels_file)
-    set_log_level(params.log_level)
+    --local labels = torch.load(ids_file)
+    local labels = torch.load(normalized_dates_file):apply(function(x) return get_bin(x, params.number_of_bins) end)
 
     local correct_predictions = {}
     for i = 1, params.number_of_bins do
@@ -50,12 +52,13 @@ function test_set(neural_network, criterion, params, data_file, labels_file)
     local starting_time = os.time()
     local fraction_done = 0
 
-    for frame_index = 1, labels:size(1), 10 do
+    for frame_index = 1, labels:size(1), 1 do
 
         local prediction = neural_network:forward(data[frame_index])
        
         v, top_index = prediction:topk(1, true, true)
-        if math.abs(top_index - labels[frame_index]) <= 5 then
+        print(top_index[1], labels[frame_index])
+        if math.abs(top_index[1] - labels[frame_index]) <= 5 then
             plus_minus_n_correct_predictions  = plus_minus_n_correct_predictions + 1
         end
 
@@ -71,10 +74,9 @@ function test_set(neural_network, criterion, params, data_file, labels_file)
 
 
         total_predictions = total_predictions + 1
-
         fraction_done = frame_index / labels:size(1)
         
-        print(fraction_done)
+        --print(fraction_done)
     end
 
     return correct_predictions, plus_minus_n_correct_predictions, total_predictions

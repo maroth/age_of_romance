@@ -18,10 +18,12 @@ function train(neural_network, criterion, params, files)
     local frame_size = torch.LongStorage{3, 176}
 
     local train_frame_cspaces = torch.load(files.train_file_cspaces)
-    local train_frame_bins = torch.load(files.train_file_ids)
+    local train_frame_bins = torch.load(files.train_file_normalized_dates):apply(function(x) return get_bin(x, params.number_of_bins) end)
+    --local train_frame_bins = torch.load(files.train_file_ids)
     
     local validate_frame_cspaces = torch.load(files.validate_file_cspaces)
-    local validate_frame_bins = torch.load(files.validate_file_ids)
+    local validate_frame_bins = torch.load(files.validate_file_normalized_dates):apply(function(x) return get_bin(x, params.number_of_bins) end)
+    --local validate_frame_bins = torch.load(files.validate_file_ids)
 
     sanity_check(neural_network, criterion, frame_size, params)
 
@@ -39,6 +41,7 @@ function train(neural_network, criterion, params, files)
     local epoch_index = 1
     local last_validate_err = nil
     local validate_err = 0
+    local validate_error_increasing = 0
     for epoch_index = 1, params.epochs do
 
         local train_err = train_epoch(neural_network, criterion, params, train_frame_cspaces, train_frame_bins, frame_size, pool, starting_time, epoch_index, number_of_train_minibatches)
@@ -55,11 +58,15 @@ function train(neural_network, criterion, params, files)
         if last_validate_err == nil then
             last_validate_err = validate_err
         elseif last_validate_err < validate_err then
-            -- break
+            validate_error_increasing = validate_error_increasing + 1
+            if validate_error_increasing > 5 then
+                break
+            end
+        else 
+            validate_error_increasing = 0
         end
         
         last_validate_err = validate_err
-
     end
 
     torch.save("models/" .. params.name .. "_" .. epoch_index .. ".model", neural_network)
