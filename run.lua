@@ -8,30 +8,29 @@ function colorspace(params)
    local net = nn.Sequential()
    net:add(nn.View(3*176))
 
-   net:add(nn.Linear(3*176, 176))
+   net:add(nn.Linear(3*176, 4096))
    net:add(nn.ReLU(true))
-   net:add(nn.Linear(176, 1024))
+   net:add(nn.Linear(4096, 4096))
    net:add(nn.ReLU(true))
-   net:add(nn.Linear(1024, 1024))
+   net:add(nn.Linear(4096, 4096))
    net:add(nn.ReLU(true))
-   net:add(nn.Linear(1024, 128))
-   net:add(nn.ReLU(true))
-   net:add(nn.Linear(128, params.number_of_bins))
+   net:add(nn.Linear(4096, params.number_of_bins))
    net:add(nn.LogSoftMax())
 
    return net
 end
 
+
 local params = {
     name = 'experiment',
-    save_frequency = 10,
-    epochs = 1000000,
+    save_frequency = 5,
+    epochs = 1000,
     learningRate = 0.01,
-    number_of_bins = 5,
+    number_of_bins = 50,
     minibatch_size = 250,
-    learningRateDecay = 0.00001,
-    weightDecay = 0.005,
-    --momentum = 0.1,
+    --learningRateDecay = 0.0001,
+    --weightDecay = 0.00001,
+    --momentum = 0.001,
     --dampening = 0,
     --nesterov = false,
     log_level = 7,

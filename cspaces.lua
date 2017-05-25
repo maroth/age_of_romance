@@ -30,10 +30,10 @@ function train(neural_network, criterion, params, files)
     log(10, "Number of training frames: " ..  train_frame_cspaces:size(1))
     log(10, "Number of validation frames: " ..  validate_frame_cspaces:size(1))
 
-    local logger = optim.Logger(params.name .. "-" .. 'training-error.log')
+    local logger = optim.Logger(params.name .. "-training-error.log")
     logger:setlogscale()
     logger:setNames{'Training error', 'Validation error'}
-    logger:style{'+-', '+-'}
+    logger:style{'+', '+'}
     logger:display(false)
 
     local starting_time = os.time()

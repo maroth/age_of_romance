@@ -1,5 +1,5 @@
 #!/bin/bash
 
-th run.lua distributed full cspace_1_8layer
-th run.lua continuous full cspace_1_8layer
-th run.lua separate full cspace_1_8layer
+th run.lua distributed full first_real_run
+th run.lua continuous full first_real_run
+th run.lua separate full first_real_run
