@@ -331,5 +331,5 @@ function aor_net(params)
     model:add(nn.Linear(2048, 50))
     model:add(nn.LogSoftMax());
 
-    return network
+    return model
 end
