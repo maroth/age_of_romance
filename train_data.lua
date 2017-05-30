@@ -1,4 +1,5 @@
 require 'nn'
+require 'cunn'
 require 'optim'
 require 'lfs'
 require 'image'
@@ -15,7 +16,7 @@ local current_minibatch = {}
 local next_minibatch = {}
 
 
-function train(neural_network, criterion, params, train_frame_dir, validate_frame_dir) 
+function train(neural_network, criterion, params, train_frame_dir, validate_frame_dir)
 
     weights, weight_gradients = neural_network:getParameters()
 
@@ -39,8 +40,7 @@ function train(neural_network, criterion, params, train_frame_dir, validate_fram
     logger:setlogscale()
     logger:setNames{'Training error', 'Validation error'}
     logger:style{'+-', '+-'}
-    logger:display(false)
-
+    logger.showPlot = false --:display(false)
     local pool = threads.Threads(1, function(thread_id) end)
     local starting_time = os.time()
     local number_of_train_minibatches = get_number_of_minibatches(#frame_files, params.minibatch_size)
@@ -48,9 +48,7 @@ function train(neural_network, criterion, params, train_frame_dir, validate_fram
     for epoch_index = 1, params.epochs do
         current_minibatch.index = 1
         next_minibatch.index = 2
-
         local train_err = train_epoch(neural_network, criterion, params, frame_files, frame_films, frame_size, pool, starting_time, epoch_index, number_of_train_minibatches)
-
         local validate_err = validate(neural_network, criterion, params, validate_files, validate_films, frame_size, pool, number_of_validate_minibatches)
 
         log(9, epoch_summary(epoch_index, params.epochs, train_err, validate_err, params.minibatch_size, starting_time))
@@ -65,7 +63,7 @@ function train(neural_network, criterion, params, train_frame_dir, validate_fram
 
     logger:plot()
 
-    torch.save("models/" .. params.model_filename .. epoch_index .. ".model", neural_network)
+    torch.save("models/" .. params.model_filename .. "_final.model", neural_network)
     return neural_network
 end
 
@@ -90,10 +88,10 @@ function train_epoch(neural_network, criterion, params, frame_files, frame_films
 
         pool:synchronize()
 
-        current_minibatch.frames = torch.CudaTensor(next_minibatch.frames:size()):copy(next_minibatch.frames:cuda())
-        current_minibatch.bins = torch.LongTensor(next_minibatch.bins):copy(next_minibatch.bins)
+        current_minibatch.frames = torch.DoubleTensor(next_minibatch.frames:size()):copy(next_minibatch.frames):cuda()
+        current_minibatch.bins = torch.LongTensor(next_minibatch.bins):copy(next_minibatch.bins):cuda()
 
-        current_minibatch.index = next_minibatch.index 
+        current_minibatch.index = next_minibatch.index
         next_minibatch.index = next_minibatch.index + 1
     end
 
@@ -114,6 +112,7 @@ function validate(neural_network, criterion, params, validate_files, validate_fi
         pool:addjob(function()
             local image = require 'image'
             require 'helpers'
+	    require 'cunn'
             set_log_level(params.log_level)
             load_minibatch(params, frame_size, next_minibatch, data, current_minibatch)
         end)
@@ -123,10 +122,10 @@ function validate(neural_network, criterion, params, validate_files, validate_fi
 
         pool:synchronize()
 
-        current_minibatch.frames = torch.CudaTensor(next_minibatch.frames:size()):copy(next_minibatch.frames:cuda())
-        current_minibatch.bins = torch.LongTensor(next_minibatch.bins):copy(next_minibatch.bins)
+        current_minibatch.frames = torch.CudaTensor(next_minibatch.frames:size()):copy(next_minibatch.frames)
+        current_minibatch.bins = torch.CudaTensor(next_minibatch.bins:size()):copy(next_minibatch.bins)
 
-        current_minibatch.index = next_minibatch.index 
+        current_minibatch.index = next_minibatch.index
         next_minibatch.index = next_minibatch.index + 1
     end
 
@@ -148,39 +147,39 @@ function train_minibatch(neural_network, criterion, params, minibatch, epoch_ind
         weight_gradients:zero()
 
         -- forward the minibatch through the network, getting the prediction
+        normalize_data(minibatch.frames)
         local prediction = neural_network:forward(minibatch.frames)
         if (prediction:size(1) > 1) then
             local_prediction = prediction[1][1]
-        else
             local_prediction = prediction[1]
         end
         --log(2, "Fed minibatch " .. minibatch.index .. " into network, prediction is " .. local_prediction)
 
         -- forward the prediction through the criterion to the the error
         -- local err = criterion:forward(prediction, minibatch.dates)
-        local err = criterion:forward(prediction, minibatch.bins)
+        local err = criterion:forward(prediction:cuda(), minibatch.bins:cuda())
         --log(2, "Forwarded prediction for minibatch " .. minibatch.index .. " into criterion, error is " .. err)
 
-        -- calculate the gradient error by feeding the prediction 
+        -- calculate the gradient error by feeding the prediction
         -- and the ground truth backwards through the criterion
         -- local grad_criterion = criterion:backward(prediction, minibatch.dates)
-        local grad_criterion = criterion:backward(prediction, minibatch.bins)
+        local grad_criterion = criterion:backward(prediction:cuda(), minibatch.bins:cuda())
         --log(2, "Backwarded prediction for minibatch " .. minibatch.index .. " into criterion, mean grad_criterion is " .. grad_criterion:mean())
 
         -- feed the gradients backward through the network
-        neural_network:backward(minibatch.frames, grad_criterion)
+        neural_network:backward(minibatch.frames:cuda(), grad_criterion)
 
         log(7, minibatch_summary(minibatch.index, number_of_minibatches, epoch_index, params.epochs, starting_time, err))
-        
+
         return err, weight_gradients
     end
-
     local new_weights, err = optim.sgd(feval, weights, params)
-    
+
     return err[1]
 end
 
 function validate_minibatch(neural_network, criterion, params, minibatch)
+    normalize_data(minibatch.frames:cuda())
     local prediction = neural_network:forward(minibatch.frames)
     if (prediction:size(1) > 1) then
         local_prediction = prediction[1][1]

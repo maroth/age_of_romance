@@ -8,7 +8,7 @@ end
 local last_str = ""
 function update_output(str)
     io.write(('\b \b'):rep(#last_str))
-    io.write(str)                     
+    io.write(str)
     io.flush()
     last_str = str
 end
@@ -48,7 +48,7 @@ end
 
 
 local log_threshold = 1
-function set_log_level(log_level) 
+function set_log_level(log_level)
     log_threshold = log_level
 end
 
@@ -89,3 +89,13 @@ function load_minibatch(params, frame_size, minibatch, shuffled_data)
     --log(3, "Load thread: loading complete for minibatch " .. minibatch.index)
 end
 
+function normalize_data(data_to_normalize)
+  mean = {}
+  stdv = {}
+  for i=1,3 do
+      mean[i] = data_to_normalize:select(2, 1):mean()
+      data_to_normalize:select(2, 1):add(-mean[i])
+      stdv[i] = data_to_normalize:select(2, i):std()
+      data_to_normalize:select(2, i):div(stdv[i])
+  end
+end

@@ -302,18 +302,52 @@ function vgg_mnist(params)
     return network
 end
 
+function simpleCase(params)
+  model = nn.Sequential()
+  model:add(nn.SpatialConvolution(3, 64, 3, 3, 1, 1, 1, 1))
+  model:add(nn.Threshold())
+  model:add(nn.ReLU())
+  model:add(nn.SpatialMaxPooling(2,2))
+  model:add(nn.Threshold())
+  model:add(nn.SpatialConvolution(64, 128, 3, 3, 1, 1, 1, 1))
+  model:add(nn.Threshold())
+  model:add(nn.ReLU())
+  model:add(nn.SpatialMaxPooling(2,2))
+  model:add(nn.Threshold())
+  model:add(nn.SpatialConvolution(128, 256, 3, 3, 1, 1, 1, 1))
+  model:add(nn.Threshold())
+  model:add(nn.ReLU())
+  model:add(nn.SpatialConvolution(256, 256, 3, 3, 1, 1, 1, 1))
+  model:add(nn.Threshold())
+  model:add(nn.ReLU())
+  model:add(nn.SpatialMaxPooling(2,2))
+  model:add(nn.Threshold())
+
+  model:add(nn.View(256*4*4))
+  model:add(nn.Linear(256*4*4, 4096))
+  model:add(nn.Threshold())
+  model:add(nn.Linear(4096, 2048))
+  model:add(nn.Threshold())
+  model:add(nn.Linear(2048, 50))
+  model:add(nn.LogSoftMax());
+  return model
+end
+
 function aor_net(params)
     local model = nn.Sequential()
+
     model:add(nn.SpatialConvolution(3, 64, 3, 3, 1, 1, 1, 1))
     model:add(nn.Threshold())
     model:add(nn.ReLU())
     model:add(nn.SpatialMaxPooling(2,2))
     model:add(nn.Threshold())
+
     model:add(nn.SpatialConvolution(64, 128, 3, 3, 1, 1, 1, 1))
     model:add(nn.Threshold())
     model:add(nn.ReLU())
     model:add(nn.SpatialMaxPooling(2,2))
     model:add(nn.Threshold())
+
     model:add(nn.SpatialConvolution(128, 256, 3, 3, 1, 1, 1, 1))
     model:add(nn.Threshold())
     model:add(nn.ReLU())
@@ -323,13 +357,38 @@ function aor_net(params)
     model:add(nn.SpatialMaxPooling(2,2))
     model:add(nn.Threshold())
 
-    model:add(nn.View(256*4*4))
-    model:add(nn.Linear(256*4*4, 4096))
+    model:add(nn.SpatialConvolution(256, 512, 3, 3, 1, 1, 1, 1))
+    model:add(nn.Threshold())
+    model:add(nn.ReLU())
+    model:add(nn.SpatialConvolution(512, 512, 3, 3, 1, 1, 1, 1))
+    model:add(nn.Threshold())
+    model:add(nn.ReLU())
+    model:add(nn.SpatialMaxPooling(2,2))
+    model:add(nn.Threshold())
+
+    model:add(nn.SpatialConvolution(512, 1024, 3, 3, 1, 1, 1, 1))
+    model:add(nn.Threshold())
+    model:add(nn.ReLU())
+    model:add(nn.SpatialConvolution(1024, 1024, 3, 3, 1, 1, 1, 1))
+    model:add(nn.Threshold())
+    model:add(nn.ReLU())
+    model:add(nn.SpatialMaxPooling(2,2))
+    model:add(nn.Threshold())
+
+    model:add(nn.SpatialConvolution(1024, 4096, 3, 3, 1, 1, 1, 1))
+    model:add(nn.Threshold())
+    model:add(nn.ReLU())
+    model:add(nn.SpatialMaxPooling(2,2))
+    model:add(nn.Threshold())
+
+    model:add(nn.View(4096))
+    model:add(nn.Linear(4096, 4096))
     model:add(nn.Threshold())
     model:add(nn.Linear(4096, 2048))
     model:add(nn.Threshold())
-    model:add(nn.Linear(2048, 50))
+    model:add(nn.Linear(2048, 1024))
+    model:add(nn.Threshold())
+    model:add(nn.Linear(1024, 50))
     model:add(nn.LogSoftMax());
-
     return model
 end
